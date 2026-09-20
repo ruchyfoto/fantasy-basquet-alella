@@ -1,4 +1,28 @@
-const players = [
+// ============================================
+// SUPABASE CONNECTION TEST
+// ============================================
+
+const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+);
+
+async function testSupabaseConnection() {
+    const { data, error } = await supabaseClient
+        .from('players')
+        .select('id, name, position, current_value')
+        .limit(5);
+
+    if (error) {
+        console.error('ERROR SUPABASE:', error);
+        return;
+    }
+
+    console.log('SUPABASE CONNECTAT CORRECTAMENT');
+    console.log('Jugadors:', data);
+}
+
+testSupabaseConnection();const players = [
   {id:'J001',name:'Arnau Puig',team:'Alella Blau',value:10,points:42,bonus:false},
   {id:'J002',name:'Biel Serra',team:'Alella Blau',value:12,points:55,bonus:false},
   {id:'J003',name:'Nil Casas',team:'Alella Blanc',value:9,points:38,bonus:false},
