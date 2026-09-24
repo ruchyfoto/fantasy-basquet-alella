@@ -39,3 +39,11 @@ V15.1 - REGISTRE I INICI DE SESSIÓ
 - El registre demana repetir la contrasenya.
 - Els entrenadors es registren amb el seu propi correu; l'administrador els vincula després al seu perfil d'entrenador.
 - No cal vincular el compte personal de l'administrador amb cap entrenador.
+
+
+V16 — Retrocedir jornades i mercat dinàmic
+- El valor dels jugadors varia automàticament segons victòries/derrotes i jugador destacat.
+- El valor dels entrenadors és independent per entrenador + equip real.
+- Administració: botó «Retrocedir última jornada» per desfer punts, valors, destacats i resultats de l’última jornada processada.
+- Les plantilles i transferències no es modifiquen durant el rollback.
+- Executa SETUP_V16.sql a Supabase abans de publicar aquesta versió.
