@@ -1,21 +1,41 @@
-# Fantasy Bàsquet Alella — primera versió funcional de prova
+FANTASY BASQUET ALELLA - V13
 
-Aquesta versió parteix del disseny original i incorpora una simulació funcional del Fantasy.
+Primera versió funcional amb comptes d'usuari i panell d'administració de prova.
 
-Inclou:
-- Inici
-- La meva plantilla
-- Mercat amb cerca i filtre per equip
-- Fitxar i vendre jugadors
-- Pressupost de 100 M€
-- Màxim 8 jugadors
-- Màxim 2 jugadors del mateix equip real
-- Capità
-- Classificació de prova
-- Panell d'entrenador amb bonus d'actitud/esforç
-- Persistència local al navegador amb localStorage
+CANVIS V13
+- Pressupost inicial: 120 M€.
+- Cada usuari autenticat té el seu propi equip Fantasy.
+- Alta i inici de sessió amb Supabase Auth (correu + contrasenya; nom d'usuari per al perfil).
+- Panell d'administració amagat: fes 5 clics ràpids sobre el logo i introdueix el PIN de prova 1234.
+- Administració: resultats de jornada, nova jornada i reset de dades de prova.
+- Els entrenadors ja no mostren cap dorsal/ID a les seves cartes.
 
-Els jugadors, equips i punts actuals són ficticis i només serveixen per provar el funcionament.
-No hi ha encara comptes d'usuari ni base de dades compartida. Aquest serà el següent pas.
+IMPORTANT: el PIN 1234 és només una protecció visual de prova. No és seguretat real de producció.
 
-La foto del jugador i la posició no formen part del model actual. Les fotos es podran afegir més endavant.
+1. Executa SETUP_V13.sql al SQL Editor de Supabase una sola vegada.
+2. Si Supabase té activada la confirmació obligatòria del correu, cal confirmar el correu abans d'iniciar sessió.
+3. Obre OBRIR_FANTASY.command.
+
+L'app utilitza el projecte Supabase configurat a config.js.
+
+
+V15 - PANELL D'ENTRENADOR
+
+1. Executa SETUP_V15.sql a Supabase.
+2. Els entrenadors necessiten un compte normal de Supabase.
+3. Després, un administrador ha de vincular el compte amb el coach corresponent a public.coach_users.
+   Exemple (substitueix l'UUID i el coach_id):
+
+   insert into public.coach_users(user_id, coach_id) values ('UUID_DEL_COMPTE', 1);
+
+4. El compte vinculat veurà la pestanya Panell d'entrenador.
+5. L'administrador desa primer els resultats. Els entrenadors seleccionen el jugador destacat.
+6. Quan tots els destacats estiguin seleccionats, l'administrador prem Processar jornada.
+
+V15 inclou: mercat de jugadors i entrenadors, classificació, capità i panell d'entrenador.
+
+V15.1 - REGISTRE I INICI DE SESSIÓ
+- Pantalla d'inici de sessió i creació de compte preparada per a jugadors i entrenadors.
+- El registre demana repetir la contrasenya.
+- Els entrenadors es registren amb el seu propi correu; l'administrador els vincula després al seu perfil d'entrenador.
+- No cal vincular el compte personal de l'administrador amb cap entrenador.
