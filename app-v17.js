@@ -197,7 +197,7 @@ async function setHighlight(playerId,teamId){
   if(!p)return;
   if(!confirm(`Seleccionar ${p.name} ${p.surname||''} com a jugador destacat?`))return;
   try{
-    const r=await rpc('coach_set_round_highlight',{p_round_id:state.round?.id,p_real_team_id:teamId,p_player_id:playerId});
+    const r=await rpc('set_team_round_highlight',{p_real_team_id:teamId,p_player_id:playerId});
     const text=await r.text();
     if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
     alert('✅ Jugador destacat guardat.');
@@ -208,11 +208,48 @@ async function setHighlight(playerId,teamId){
 
 async function loadCoachContext(){
   try{
-    const r=await rpc('get_my_coach_context',{});
-    const text=await r.text();
-    if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
-    state.coachContext=JSON.parse(text||'[]');
-    const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display=state.coachContext.length?'inline-flex':'none';
+    // Carreguem el context directament des de les taules per evitar dependre
+    // d'una versió concreta de la funció RPC.
+    const cpR=await api(`coach_profiles?select=coach_id&user_id=eq.${encodeURIComponent(state.session?.user?.id||'')}&limit=1`);
+    if(!cpR.ok) throw new Error(await cpR.text());
+    const cps=await cpR.json();
+    const coachId=cps[0]?.coach_id;
+    if(!coachId){ state.coachContext=[]; const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='none'; return; }
+
+    const [ctR,roundR]=await Promise.all([
+      api(`coach_teams?coach_id=eq.${coachId}&select=real_team_id`),
+      api('fantasy_rounds?is_active=eq.true&select=id,round_number&order=round_number.desc&limit=1')
+    ]);
+    if(!ctR.ok) throw new Error(await ctR.text());
+    if(!roundR.ok) throw new Error(await roundR.text());
+    const coachTeams=await ctR.json();
+    const round=(await roundR.json())[0];
+    if(!round){ state.coachContext=[]; const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='none'; return; }
+
+    const ids=coachTeams.map(x=>Number(x.real_team_id)).filter(Number.isFinite);
+    if(!ids.length){ state.coachContext=[]; const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='none'; return; }
+    const idList=ids.join(',');
+    const [teamsR,resR,highR,coachR]=await Promise.all([
+      api(`real_teams?id=in.(${idList})&select=id,name`),
+      api(`team_round_results?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,result`),
+      api(`team_round_highlights?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,player_id`),
+      api(`coaches?id=eq.${coachId}&select=name,surname&limit=1`)
+    ]);
+    for(const r of [teamsR,resR,highR,coachR]) if(!r.ok) throw new Error(await r.text());
+    const teams=await teamsR.json(), results=await resR.json(), highlights=await highR.json(), coaches=await coachR.json();
+    const resultByTeam=Object.fromEntries(results.map(x=>[String(x.real_team_id),x.result]));
+    const highlightByTeam=Object.fromEntries(highlights.map(x=>[String(x.real_team_id),x.player_id]));
+    const teamById=Object.fromEntries(teams.map(x=>[String(x.id),x.name]));
+    const coach=coaches[0];
+    state.coachContext=ids.map(id=>({
+      coach_name: coach ? `${coach.name||''} ${coach.surname||''}`.trim() : 'Entrenador',
+      real_team_id:id,
+      real_team_name:teamById[String(id)]||teamName(id),
+      result:resultByTeam[String(id)]||null,
+      round_number:round.round_number,
+      highlighted_player_id:highlightByTeam[String(id)]||null
+    }));
+    const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='inline-flex';
   }catch(e){
     console.error('Coach context:',e);
     state.coachContext=[];
