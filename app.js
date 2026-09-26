@@ -85,3 +85,4 @@ function addMatch(){matches.push({id:'M'+Date.now(),home:'Equip local',away:'Equ
 function nextWeek(){currentWeek++;matches=[];save();render();}
 $('adminLoginBtn').onclick=loginAdmin;$('adminLogoutBtn').onclick=logoutAdmin;$('addMatchBtn').onclick=addMatch;$('nextWeekBtn').onclick=nextWeek;
 render();
+onerror="if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.jpg');}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.png');}"
