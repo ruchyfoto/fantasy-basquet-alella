@@ -86,3 +86,17 @@ function nextWeek(){currentWeek++;matches=[];save();render();}
 $('adminLoginBtn').onclick=loginAdmin;$('adminLogoutBtn').onclick=logoutAdmin;$('addMatchBtn').onclick=addMatch;$('nextWeekBtn').onclick=nextWeek;
 render();
 onerror="if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.jpg');}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.png');}"
+// Funció per provar extensions automàticament si falla la imatge
+function fixImageError(img) {
+  if (img.src.endsWith('.jpeg')) {
+    // Si falla .jpeg, prova amb .jpg
+    img.src = img.src.replace('.jpeg', '.jpg');
+  } else if (img.src.endsWith('.jpg')) {
+    // Si falla .jpg, prova amb .png
+    img.src = img.src.replace('.jpg', '.png');
+  } else {
+    // Si no troba cap fitxer, posa el logo per defecte i atura les proves
+    img.src = './logo.png';
+    img.onerror = null; 
+  }
+}
