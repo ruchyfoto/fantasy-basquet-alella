@@ -47,3 +47,16 @@
 <script>document.getElementById('showLogin').onclick=()=>{document.getElementById('loginForm').style.display='block';document.getElementById('signupForm').style.display='none';document.getElementById('showLogin').classList.add('active');document.getElementById('showSignup').classList.remove('active');};document.getElementById('showSignup').onclick=()=>{document.getElementById('loginForm').style.display='none';document.getElementById('signupForm').style.display='block';document.getElementById('showSignup').classList.add('active');document.getElementById('showLogin').classList.remove('active');};</script>
 </body></html>
 <img src="${player.photo_url}" alt="${player.name}" onerror="fixImageError(this)" />
+<div id="admin-panel" style="background: #f4f4f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+  <h3>🛠️ Panell d'Administració: Assignar Entrenador</h3>
+  
+  <label for="select-user">Seleccionar Usuari:</label>
+  <select id="select-user" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+
+  <label for="select-coach">Seleccionar Entrenador:</label>
+  <select id="select-coach" style="width: 100%; padding: 8px; margin-bottom: 10px;"></select>
+
+  <button onclick="asignarEntrenador()" style="background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">
+    Assignar Rol d'Entrenador
+  </button>
+</div>
