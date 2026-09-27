@@ -274,3 +274,54 @@ async function desvincularEntrenador() {
 
 // Carregar les dades al panell en obrir la pàgina
 document.addEventListener('DOMContentLoaded', cargarDatosAdmin);
+async function cargarDatosAdmin() {
+  const selectUser = document.getElementById('select-user');
+  const selectCoach = document.getElementById('select-coach');
+
+  try {
+    // 1. Carregar usuaris / equips
+    const { data: teams, error: errTeams } = await supabase
+      .from('fantasy_teams')
+      .select('owner_id, name, role');
+
+    if (errTeams) throw errTeams;
+
+    if (selectUser) {
+      if (!teams || teams.length === 0) {
+        selectUser.innerHTML = '<option value="">Sense usuaris a la BDD</option>';
+      } else {
+        selectUser.innerHTML = '<option value="">-- Selecciona un usuari --</option>';
+        teams.forEach(team => {
+          const tag = team.role === 'coach' ? ' 🏀 [COACH]' : ' 👤 [PLAYER]';
+          selectUser.innerHTML += `<option value="${team.owner_id}">${team.name}${tag}</option>`;
+        });
+      }
+    }
+
+    // 2. Carregar entrenadors
+    const { data: coaches, error: errCoaches } = await supabase
+      .from('coaches')
+      .select('id, name, surname, user_id');
+
+    if (errCoaches) throw errCoaches;
+
+    if (selectCoach) {
+      if (!coaches || coaches.length === 0) {
+        selectCoach.innerHTML = '<option value="">Sense entrenadors a la BDD</option>';
+      } else {
+        selectCoach.innerHTML = '<option value="">-- Selecciona un entrenador --</option>';
+        coaches.forEach(coach => {
+          const estat = coach.user_id ? ' ⚠️ (Ja assignat)' : ' 🟢 (Disponible)';
+          selectCoach.innerHTML += `<option value="${coach.id}">${coach.name} ${coach.surname}${estat}</option>`;
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error en carregar el panell admin:', err);
+    if (selectUser) selectUser.innerHTML = '<option value="">Error en carregar usuaris</option>';
+    if (selectCoach) selectCoach.innerHTML = '<option value="">Error en carregar entrenadors</option>';
+  }
+}
+
+// Executar en carregar la pàgina
+document.addEventListener('DOMContentLoaded', cargarDatosAdmin);
