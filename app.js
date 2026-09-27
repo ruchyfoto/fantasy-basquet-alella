@@ -100,3 +100,57 @@ function fixImageError(img) {
     img.onerror = null; 
   }
 }
+// Carregar usuaris i entrenadors als desplegables del panell
+async function cargarDatosAdmin() {
+  // 1. Obtenir la llista d'equips/usuaris
+  const { data: teams } = await supabase
+    .from('fantasy_teams')
+    .select('owner_id, name');
+
+  const selectUser = document.getElementById('select-user');
+  if (selectUser && teams) {
+    selectUser.innerHTML = '<option value="">-- Selecciona un usuari --</option>';
+    teams.forEach(team => {
+      selectUser.innerHTML += `<option value="${team.owner_id}">${team.name}</option>`;
+    });
+  }
+
+  // 2. Obtenir la llista d'entrenadors
+  const { data: coaches } = await supabase
+    .from('coaches')
+    .select('id, name, surname');
+
+  const selectCoach = document.getElementById('select-coach');
+  if (selectCoach && coaches) {
+    selectCoach.innerHTML = '<option value="">-- Selecciona un entrenador --</option>';
+    coaches.forEach(coach => {
+      selectCoach.innerHTML += `<option value="${coach.id}">${coach.name} ${coach.surname}</option>`;
+    });
+  }
+}
+
+// Funció per executar l'assignació
+async function asignarEntrenador() {
+  const userId = document.getElementById('select-user').value;
+  const coachId = document.getElementById('select-coach').value;
+
+  if (!userId || !coachId) {
+    alert('Per favor, selecciona tant un usuari com un entrenador.');
+    return;
+  }
+
+  const { error } = await supabase.rpc('assign_coach_role', {
+    p_user_id: userId,
+    p_coach_id: parseInt(coachId)
+  });
+
+  if (error) {
+    alert('Error: ' + error.message);
+  } else {
+    alert('¡S\'ha assignat el rol d\'entrenador correctament!');
+    cargarDatosAdmin(); // Recarregar desplegables
+  }
+}
+
+// Inicialitzar quan la pàgina estigui carregada
+document.addEventListener('DOMContentLoaded', cargarDatosAdmin);
