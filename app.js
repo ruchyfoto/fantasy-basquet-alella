@@ -154,3 +154,123 @@ async function asignarEntrenador() {
 
 // Inicialitzar quan la pàgina estigui carregada
 document.addEventListener('DOMContentLoaded', cargarDatosAdmin);
+// 1. Funció per canviar el nom d'usuari / equip
+async function canviarNomUsuari() {
+  const newName = document.getElementById('new-username').value.trim();
+  
+  if (!newName) {
+    alert('Per favor, escriu un nom vàlid.');
+    return;
+  }
+
+  // Obtenir l'usuari actual autenticat a Supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    alert('No s\'ha trobat cap sessió d\'usuari activa.');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('fantasy_teams')
+    .update({ name: newName })
+    .eq('owner_id', user.id);
+
+  if (error) {
+    alert('Error en canviar el nom: ' + error.message);
+  } else {
+    alert('¡Nom d\'equip actualitzat amb èxit a: ' + newName + '!');
+    document.getElementById('new-username').value = '';
+    cargarDatosAdmin(); // Actualitza la llista de l'admin
+  }
+}
+
+// 2. Carregar les opcions i llistes al panell d'administració
+async function cargarDatosAdmin() {
+  // A. Carregar equips/usuaris amb el seu rol actual
+  const { data: teams } = await supabase
+    .from('fantasy_teams')
+    .select('owner_id, name, role');
+
+  const selectUser = document.getElementById('select-user');
+  if (selectUser) {
+    selectUser.innerHTML = '<option value="">-- Selecciona un usuari --</option>';
+    if (teams) {
+      teams.forEach(team => {
+        const tag = team.role === 'coach' ? ' 🏀 [COACH]' : ' 👤 [PLAYER]';
+        selectUser.innerHTML += `<option value="${team.owner_id}">${team.name}${tag}</option>`;
+      });
+    }
+  }
+
+  // B. Carregar la llista d'entrenadors i la seva disponibilitat
+  const { data: coaches } = await supabase
+    .from('coaches')
+    .select('id, name, surname, user_id');
+
+  const selectCoach = document.getElementById('select-coach');
+  if (selectCoach) {
+    selectCoach.innerHTML = '<option value="">-- Selecciona un entrenador --</option>';
+    if (coaches) {
+      coaches.forEach(coach => {
+        const estat = coach.user_id ? ' ⚠️ (Ja assignat)' : ' 🟢 (Disponible)';
+        selectCoach.innerHTML += `<option value="${coach.id}">${coach.name} ${coach.surname}${estat}</option>`;
+      });
+    }
+  }
+}
+
+// 3. Assignar rol d'entrenador
+async function asignarEntrenador() {
+  const userId = document.getElementById('select-user').value;
+  const coachId = document.getElementById('select-coach').value;
+
+  if (!userId || !coachId) {
+    alert('Per favor, selecciona un usuari i un entrenador.');
+    return;
+  }
+
+  const { error } = await supabase.rpc('assign_coach_role', {
+    p_user_id: userId,
+    p_coach_id: parseInt(coachId)
+  });
+
+  if (error) {
+    alert('Error en assignar: ' + error.message);
+  } else {
+    alert('¡S\'ha assignat l\'entrenador correctament!');
+    cargarDatosAdmin();
+  }
+}
+
+// 4. Desvincular entrenador (tornar a rol de jugador)
+async function desvincularEntrenador() {
+  const userId = document.getElementById('select-user').value;
+
+  if (!userId) {
+    alert('Selecciona primer l\'usuari que vols desvincular.');
+    return;
+  }
+
+  // Desvincular de la taula coaches
+  await supabase
+    .from('coaches')
+    .update({ user_id: null })
+    .eq('user_id', userId);
+
+  // Canviar el rol a player a fantasy_teams
+  const { error } = await supabase
+    .from('fantasy_teams')
+    .update({ role: 'player' })
+    .eq('owner_id', userId);
+
+  if (error) {
+    alert('Error en desvincular: ' + error.message);
+  } else {
+    alert('¡Usuari desvinculat correctament i restablit com a jugador!');
+    cargarDatosAdmin();
+  }
+}
+
+// Carregar les dades al panell en obrir la pàgina
+document.addEventListener('DOMContentLoaded', cargarDatosAdmin);
