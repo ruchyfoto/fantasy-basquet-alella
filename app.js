@@ -377,3 +377,15 @@ if ($('bonusBtn'))$('bonusBtn').onclick = applyBonus;
 
 // Renderitzat inicial
 render();
+// Escolta global de clics (funciona sempre, inclús amb el filtre actiu)
+document.addEventListener('click', (e) => {
+  const btnBuy = e.target.closest('[data-buy], [data-buy-player]');
+  const btnSell = e.target.closest('[data-sell]');
+
+  if (btnBuy) {
+    const id = btnBuy.dataset.buy || btnBuy.dataset.buyPlayer || btnBuy.getAttribute('data-buy-player');
+    buy(id);
+  } else if (btnSell) {
+    sell(btnSell.dataset.sell);
+  }
+});
