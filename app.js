@@ -136,3 +136,53 @@ async function cargarClasificacionMiEquipo(miEquipoClub) {
   if (error) console.error('Error clasificación equipo:', error);
   else renderizarTabla('contenedor-clasificacion-equipo', teamData);
 }
+async function registrarUsuari(event) {
+  event.preventDefault();
+
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const teamName = document.getElementById('signup-team-name').value.trim();
+  const clubTeam = document.getElementById('signup-club-team').value;
+
+  // Validació per assegurar-nos que s'ha triat un equip
+  if (!clubTeam) {
+    alert("Per favor, selecciona el teu equip del club.");
+    return;
+  }
+
+  // 1. Crear l'usuari a Supabase Auth
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email: email,
+    password: password,
+  });
+
+  if (authError) {
+    alert("Error en crear el compte: " + authError.message);
+    return;
+  }
+
+  const user = authData.user;
+
+  if (user) {
+    // 2. Insertar directament la fila a fantasy_teams amb la dada club_team
+    const { error: dbError } = await supabase
+      .from('fantasy_teams')
+      .insert([
+        {
+          owner_id: user.id,
+          name: teamName,
+          club_team: clubTeam, // S'associa directament a la creació
+          role: 'player',
+          points: 0
+        }
+      ]);
+
+    if (dbError) {
+      alert("S'ha creat l'usuari però hi ha hagut un error guardant l'equip: " + dbError.message);
+    } else {
+      alert("Compte creat amb èxit! Benvingut/da.");
+      // Redirigir o carregar el panell principal
+      location.reload();
+    }
+  }
+}
