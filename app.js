@@ -114,3 +114,25 @@ const { data, error } = await supabase
       points: 0
     }
   ]);
+const { data: authData, error: authError } = await supabase.auth.signUp({
+  email: email,
+  password: password,
+});
+
+if (authError || !authData.user) {
+  alert("Error en el registre d'usuari: " + (authError ? authError.message : "No s'ha pogut crear l'usuari."));
+  return;
+}
+
+// Només s'executa si l'usuari de Supabase Auth existeix correctament
+const { error: dbError } = await supabase
+  .from('fantasy_teams')
+  .insert([
+    {
+      owner_id: authData.user.id, // S'utilitza l'ID generat
+      name: teamName,
+      club_team: clubTeam,
+      budget: 120,
+      role: 'player'
+    }
+  ]);
