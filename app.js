@@ -38,7 +38,7 @@ const defaultMatches=[
  {id:'M002',home:'Maresme',away:'Alella Blau',homeScore:41,awayScore:44}
 ];
 let roster=JSON.parse(localStorage.getItem('fantasyRoster')||'[]');
-let budget=Number(localStorage.getItem('fantasyBudget')||100);
+let budget=Number(localStorage.getItem('fantasyBudget')||120);
 let captain=localStorage.getItem('fantasyCaptain')||'';
 let matches=JSON.parse(localStorage.getItem('fantasyMatches')||'null')||defaultMatches;
 let currentWeek=Number(localStorage.getItem('fantasyWeek')||1);
