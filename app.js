@@ -155,3 +155,49 @@ function renderitzarMercat(llistaJugadors) {
     `;
   });
 }
+let totsElsJugadorsMercat = []; // Variable global
+
+// Carregar jugadors inicials des de Supabase
+async function carregarMercat() {
+  const { data, error } = await supabase
+    .from('players')
+    .select('*');
+
+  if (!error) {
+    totsElsJugadorsMercat = data;
+    renderitzarMercat(totsElsJugadorsMercat); // Dibuixem tots d'inici
+  }
+}
+
+// Funció que s'executa quan es canvia el filtre del desplegable (onchange)
+function filtrarJugadorsPerEquip() {
+  const equipSeleccionat = document.getElementById('select-filtre-equip').value;
+
+  if (equipSeleccionat === '' || equipSeleccionat === 'tots') {
+    // Si es tria "Tots els equips", mostrem la llista completa
+    renderitzarMercat(totsElsJugadorsMercat);
+  } else {
+    // Filtrem sobre la llista global
+    const jugadorsFiltrats = totsElsJugadorsMercat.filter(
+      jugador => jugador.club_team === equipSeleccionat
+    );
+    renderitzarMercat(jugadorsFiltrats);
+  }
+}
+async function fitxarJugador(jugadorId) {
+  if (!jugadorId) {
+    alert("Error: ID de jugador no trobat.");
+    return;
+  }
+
+  // Cercar el jugador a la llista global pel seu ID
+  const jugador = totsElsJugadorsMercat.find(j => j.id === jugadorId);
+
+  if (!jugador) {
+    alert("No s'ha trobat la informació d'aquest jugador.");
+    return;
+  }
+
+  // Executar la lògica de fitxatge (inserir a fantasy_team_players i restar el pressupost)
+  // ...
+}
