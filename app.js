@@ -100,5 +100,18 @@ function fixImageError(img) {
     img.onerror = null; 
   }
 }
+const selectedClubTeam = document.getElementById('club-team-select').value;
 
+// Al guardar/crear el equipo en Supabase:
+const { data, error } = await supabase
+  .from('fantasy_teams')
+  .insert([
+    {
+      owner_id: user.id,
+      name: nombreEquipoFantasy,
+      club_team: selectedClubTeam, // Guardamos el equipo seleccionado
+      role: 'player',
+      points: 0
+    }
+  ]);
  
