@@ -114,4 +114,25 @@ const { data, error } = await supabase
       points: 0
     }
   ]);
- 
+ // A. Cargar Clasificación General (Todos los participantes)
+async function cargarClasificacionGeneral() {
+  const { data: generalData, error } = await supabase
+    .from('fantasy_teams')
+    .select('name, points, club_team')
+    .order('points', { ascending: false });
+
+  if (error) console.error('Error clasificación general:', error);
+  else renderizarTabla('contenedor-clasificacion-general', generalData);
+}
+
+// B. Cargar Clasificación por Equipo del Club
+async function cargarClasificacionMiEquipo(miEquipoClub) {
+  const { data: teamData, error } = await supabase
+    .from('fantasy_teams')
+    .select('name, points')
+    .eq('club_team', miEquipoClub) // Filtra solo los usuarios de su mismo equipo
+    .order('points', { ascending: false });
+
+  if (error) console.error('Error clasificación equipo:', error);
+  else renderizarTabla('contenedor-clasificacion-equipo', teamData);
+}
