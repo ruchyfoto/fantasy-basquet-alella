@@ -1,8 +1,8 @@
 // ============================================
 // 1. CONFIGURACIÓ I CONNEXIÓ SUPABASE
 // ============================================
-const SUPABASE_URL = 'LA_TEVA_SUPABASE_URL'; // Canvia-ho per la teva URL si en fas servir
-const SUPABASE_ANON_KEY = 'LA_TEVA_SUPABASE_KEY'; // Canvia-ho per la teva clau
+const SUPABASE_URL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudWptdWdvbm1manlhbHlnZmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4NTYzMzUsImV4cCI6MjEwNTQzMjMzNX0.VF4b7w5dJ_7GUtvO_7TNfw_Mvi7QfsBC17tvFn26YHk'; // Canvia-ho per la teva URL si en fas servir
+const SUPABASE_ANON_KEY = 'sb_publishable_xRj1AZ-BzIm-2_eXg0PU8g_NqljVrF'; // Canvia-ho per la teva clau
 
 let supabaseClient = null;
 if (window.supabase) {
