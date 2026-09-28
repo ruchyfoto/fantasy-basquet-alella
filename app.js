@@ -201,3 +201,20 @@ async function fitxarJugador(jugadorId) {
   // Executar la lògica de fitxatge (inserir a fantasy_team_players i restar el pressupost)
   // ...
 }
+// Escolta global de clics per als botons de fitxar
+document.addEventListener('click', async (event) => {
+  // Comprova si el clic s'ha fet en un botó de fitxar (o un element intern)
+  const buyButton = event.target.closest('[data-buy-player]');
+  
+  if (buyButton) {
+    const playerId = buyButton.getAttribute('data-buy-player');
+    console.log("Intentant fitxar el jugador amb ID:", playerId);
+    
+    // Crida a la teva funció habitual per fitxar
+    if (typeof fitxarJugador === 'function') {
+      await fitxarJugador(playerId);
+    } else if (typeof buyPlayer === 'function') {
+      await buyPlayer(playerId);
+    }
+  }
+});
