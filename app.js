@@ -136,3 +136,22 @@ const { error: dbError } = await supabase
       role: 'player'
     }
   ]);
+// Funció per dibuixar la llista de jugadors al mercat
+function renderitzarMercat(llistaJugadors) {
+  const mercatContainer = document.getElementById('mercat-container');
+  mercatContainer.innerHTML = ''; // Netejem el contenidor
+
+  llistaJugadors.forEach(jugador => {
+    mercatContainer.innerHTML += `
+      <div class="jugador-card">
+        <img src="${jugador.photo_url || 'placeholder.jpg'}" alt="${jugador.name}">
+        <h3>${jugador.name}</h3>
+        <p>Equip: ${jugador.club_team}</p>
+        <p>Preu: ${jugador.price}M</p>
+        
+        <!-- IMPORTANT: Passar SEMPRE jugador.id entre cometes -->
+        <button onclick="fitxarJugador('${jugador.id}')">Fitxar</button>
+      </div>
+    `;
+  });
+}
