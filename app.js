@@ -1,220 +1,379 @@
 // ============================================
-// SUPABASE CONNECTION TEST
+// 1. CONFIGURACIÓ I CONNEXIÓ SUPABASE
 // ============================================
+const SUPABASE_URL = 'LA_TEVA_SUPABASE_URL'; // Canvia-ho per la teva URL si en fas servir
+const SUPABASE_ANON_KEY = 'LA_TEVA_SUPABASE_KEY'; // Canvia-ho per la teva clau
 
-const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-);
+let supabaseClient = null;
+if (window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 async function testSupabaseConnection() {
-    const { data, error } = await supabaseClient
-        .from('players')
-        .select('id, name, position, current_value')
-        .limit(5);
-
-    if (error) {
-        console.error('ERROR SUPABASE:', error);
-        return;
-    }
-
-    console.log('SUPABASE CONNECTAT CORRECTAMENT');
-    console.log('Jugadors:', data);
-}
-
-testSupabaseConnection();const players = [
-  {id:'J001',name:'Arnau Puig',team:'Alella Blau',value:10,points:42,bonus:false},
-  {id:'J002',name:'Biel Serra',team:'Alella Blau',value:12,points:55,bonus:false},
-  {id:'J003',name:'Nil Casas',team:'Alella Blanc',value:9,points:38,bonus:false},
-  {id:'J004',name:'Pol Ferrer',team:'Alella Blanc',value:11,points:49,bonus:false},
-  {id:'J005',name:'Jan Soler',team:'Maresme',value:14,points:63,bonus:false},
-  {id:'J006',name:'Pau Riera',team:'Maresme',value:8,points:31,bonus:false},
-  {id:'J007',name:'Marc Vila',team:'Alella Blau',value:13,points:58,bonus:false},
-  {id:'J008',name:'Èric Costa',team:'Alella Blanc',value:7,points:27,bonus:false}
-];
-const participants=[{name:'Roger',points:128,team:'Els Trons'},{name:'Julia',points:116,team:'Les Estrelles'},{name:'Max',points:104,team:'Els Guerrers'}];
-const defaultMatches=[
- {id:'M001',home:'Alella Blau',away:'Alella Blanc',homeScore:52,awayScore:48},
- {id:'M002',home:'Maresme',away:'Alella Blau',homeScore:41,awayScore:44}
-];
-let roster=JSON.parse(localStorage.getItem('fantasyRoster')||'[]');
-let budget=Number(localStorage.getItem('fantasyBudget')||120);
-let captain=localStorage.getItem('fantasyCaptain')||'';
-let matches=JSON.parse(localStorage.getItem('fantasyMatches')||'null')||defaultMatches;
-let currentWeek=Number(localStorage.getItem('fantasyWeek')||1);
-let adminMode=localStorage.getItem('fantasyAdmin')==='1';
-const $=id=>document.getElementById(id);
-const money=n=>`${Number(n).toFixed(1).replace('.',',')} M€`;
-function save(){localStorage.setItem('fantasyRoster',JSON.stringify(roster));localStorage.setItem('fantasyBudget',budget);localStorage.setItem('fantasyCaptain',captain);localStorage.setItem('fantasyMatches',JSON.stringify(matches));localStorage.setItem('fantasyWeek',currentWeek);localStorage.setItem('fantasyAdmin',adminMode?'1':'0');}
-function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
-document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showSection(t.dataset.section)));
-function playerCard(p,inTeam=false){return `<article class="player-card"><div class="avatar">${p.name.split(' ').map(x=>x[0]).join('').slice(0,2)}</div><div class="player-info"><h3>${p.name}</h3><span>${p.team}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(p.value)}</b></div><div><small>Punts</small><b>${p.points}</b></div></div>${p.bonus?'<div class="bonus">⭐ Bonus setmana</div>':''}<div class="card-actions">${inTeam?`<button class="secondary" data-sell="${p.id}">Vendre</button>${captain===p.id?'':`<button class="secondary" data-captain="${p.id}">Fer capità</button>`}`:`<button class="primary" data-buy="${p.id}">Fitxar · ${money(p.value)}</button>`}</div></article>`}
-function render(){
- $('budget').textContent=money(budget);$('rosterCount').textContent=`${roster.length}/8`;$('playerTotal').textContent=players.length;$('teamTotal').textContent=new Set(players.map(p=>p.team)).size;$('weekLabel').textContent=`Jornada ${currentWeek}`;$('captainName').textContent=players.find(p=>p.id===captain)?.name||'pendent';
- const teams=[...new Set(players.map(p=>p.team))];$('teamFilter').innerHTML='<option value="">Tots els equips</option>'+teams.map(t=>`<option>${t}</option>`).join('');
- renderMarket();renderTeam();renderRanking();renderCoach();renderResults();renderAdmin();bindActions();
- $('adminStatus').textContent=adminMode?'Administrador actiu':'Mode jugador';
-}
-function renderMarket(){const q=($('search').value||'').toLowerCase();const team=$('teamFilter').value;const html=players.filter(p=>(p.name.toLowerCase().includes(q)||p.team.toLowerCase().includes(q))&&(!team||p.team===team)).map(p=>playerCard(p,false)).join('');$('marketGrid').innerHTML=html||'<div class="empty-state"><div class="empty-icon">🔎</div><h3>No hem trobat cap jugador</h3><p>Prova un altre nom o equip.</p></div>';}
-function renderTeam(){if(!roster.length){$('teamGrid').innerHTML='<div class="empty-state"><div class="empty-icon">👕</div><h3>Encara no tens plantilla</h3><p>Ves al mercat per començar a construir el teu equip.</p><button class="primary" data-go="market">Anar al mercat</button></div>';return}$('teamGrid').innerHTML=roster.map(id=>playerCard(players.find(p=>p.id===id),true)).join('');}
-function renderRanking(){const own={name:'Roger',points:roster.reduce((s,id)=>s+(players.find(p=>p.id===id)?.points||0),0),team:'La meva plantilla'};const rows=[...participants,own].sort((a,b)=>b.points-a.points);$('rankingBody').innerHTML=rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.name}</td><td><b>${r.points}</b></td><td>${r.team}</td></tr>`).join('');}
-function renderCoach(){$('coachPlayer').innerHTML=players.map(p=>`<option value="${p.id}">${p.name} · ${p.team}${p.bonus?' · ⭐':''}</option>`).join('');}
-function renderResults(){
- $('resultsWeek').textContent=`Jornada ${currentWeek}`;
- $('resultsList').innerHTML=matches.length?matches.map(m=>`<div class="match"><div><b>${m.home}</b><span> vs </span><b>${m.away}</b></div><strong>${m.homeScore} - ${m.awayScore}</strong></div>`).join(''):'<div class="empty-state"><div class="empty-icon">🏀</div><h3>Encara no hi ha resultats</h3><p>L’administrador els podrà afegir des del panell.</p></div>';
-}
-function renderAdmin(){
- $('adminLoginCard').style.display=adminMode?'none':'block';$('adminPanel').style.display=adminMode?'block':'none';
- $('adminMatches').innerHTML=matches.map((m,i)=>`<div class="admin-match"><div class="admin-match-row"><input data-match-home="${i}" value="${m.home}"><input class="score" type="number" min="0" data-match-hs="${i}" value="${m.homeScore}"><span>–</span><input class="score" type="number" min="0" data-match-as="${i}" value="${m.awayScore}"><input data-match-away="${i}" value="${m.away}"><button class="secondary danger" data-delete-match="${i}">Eliminar</button></div></div>`).join('');
-}
-function bindActions(){
- document.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>buy(b.dataset.buy));document.querySelectorAll('[data-sell]').forEach(b=>b.onclick=()=>sell(b.dataset.sell));document.querySelectorAll('[data-captain]').forEach(b=>b.onclick=()=>{captain=b.dataset.captain;save();render()});document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>showSection(b.dataset.go));
- $('bonusBtn').onclick=applyBonus;$('search').oninput=renderMarket;$('teamFilter').onchange=renderMarket;
- document.querySelectorAll('[data-delete-match]').forEach(b=>b.onclick=()=>{matches.splice(Number(b.dataset.deleteMatch),1);save();render()});
- document.querySelectorAll('[data-match-home]').forEach(i=>i.onchange=()=>{matches[Number(i.dataset.matchHome)].home=i.value;save()});
- document.querySelectorAll('[data-match-away]').forEach(i=>i.onchange=()=>{matches[Number(i.dataset.matchAway)].away=i.value;save()});
- document.querySelectorAll('[data-match-hs]').forEach(i=>i.onchange=()=>{matches[Number(i.dataset.matchHs)].homeScore=Number(i.value)||0;save()});
- document.querySelectorAll('[data-match-as]').forEach(i=>i.onchange=()=>{matches[Number(i.dataset.matchAs)].awayScore=Number(i.value)||0;save()});
-}
-function buy(id){const p=players.find(x=>x.id===id);if(roster.includes(id))return alert('Aquest jugador ja forma part de la plantilla.');if(roster.length>=8)return alert('La plantilla ja té 8 jugadors.');const same=roster.filter(x=>players.find(p=>p.id===x).team===p.team).length;if(same>=2)return alert('No pots tenir més de 2 jugadors del mateix equip.');if(budget<p.value)return alert('No tens prou pressupost.');roster.push(id);budget-=p.value;save();render();showSection('team');}
-function sell(id){const p=players.find(x=>x.id===id);roster=roster.filter(x=>x!==id);budget+=p.value;if(captain===id)captain='';save();render();}
-function applyBonus(){const p=players.find(p=>p.id===$('coachPlayer').value);if(p.bonus){$('coachMessage').innerHTML='⚠️ Aquest jugador ja ha rebut el bonus de prova.';return}p.bonus=true;p.points+=10;p.value+=0.5;$('coachMessage').innerHTML=`✅ <b>${p.name}</b> ha rebut el bonus: +10 punts i +0,5 M€.`;render();}
-function loginAdmin(){if($('adminPin').value==='1234'){adminMode=true;save();render();}else $('adminLoginMessage').textContent='PIN incorrecte. En aquesta demo el PIN és 1234.';}
-function logoutAdmin(){adminMode=false;save();render();showSection('home');}
-function addMatch(){matches.push({id:'M'+Date.now(),home:'Equip local',away:'Equip visitant',homeScore:0,awayScore:0});save();render();showSection('admin');}
-function nextWeek(){currentWeek++;matches=[];save();render();}
-$('adminLoginBtn').onclick=loginAdmin;$('adminLogoutBtn').onclick=logoutAdmin;$('addMatchBtn').onclick=addMatch;$('nextWeekBtn').onclick=nextWeek;
-render();
-onerror="if(this.src.endsWith('.jpeg')){this.src=this.src.replace('.jpeg','.jpg');}else if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.png');}"
-// Funció per provar extensions automàticament si falla la imatge
-function fixImageError(img) {
-  if (img.src.endsWith('.jpeg')) {
-    // Si falla .jpeg, prova amb .jpg
-    img.src = img.src.replace('.jpeg', '.jpg');
-  } else if (img.src.endsWith('.jpg')) {
-    // Si falla .jpg, prova amb .png
-    img.src = img.src.replace('.jpg', '.png');
-  } else {
-    // Si no troba cap fitxer, posa el logo per defecte i atura les proves
-    img.src = './logo.png';
-    img.onerror = null; 
-  }
-}
-const selectedClubTeam = document.getElementById('club-team-select').value;
-
-// Al guardar/crear el equipo en Supabase:
-const { data, error } = await supabase
-  .from('fantasy_teams')
-  .insert([
-    {
-      owner_id: user.id,
-      name: nombreEquipoFantasy,
-      club_team: selectedClubTeam, // Guardamos el equipo seleccionado
-      role: 'player',
-      points: 0
-    }
-  ]);
-const { data: authData, error: authError } = await supabase.auth.signUp({
-  email: email,
-  password: password,
-});
-
-if (authError || !authData.user) {
-  alert("Error en el registre d'usuari: " + (authError ? authError.message : "No s'ha pogut crear l'usuari."));
-  return;
-}
-
-// Només s'executa si l'usuari de Supabase Auth existeix correctament
-const { error: dbError } = await supabase
-  .from('fantasy_teams')
-  .insert([
-    {
-      owner_id: authData.user.id, // S'utilitza l'ID generat
-      name: teamName,
-      club_team: clubTeam,
-      budget: 120,
-      role: 'player'
-    }
-  ]);
-// Funció per dibuixar la llista de jugadors al mercat
-function renderitzarMercat(llistaJugadors) {
-  const mercatContainer = document.getElementById('mercat-container');
-  mercatContainer.innerHTML = ''; // Netejem el contenidor
-
-  llistaJugadors.forEach(jugador => {
-    mercatContainer.innerHTML += `
-      <div class="jugador-card">
-        <img src="${jugador.photo_url || 'placeholder.jpg'}" alt="${jugador.name}">
-        <h3>${jugador.name}</h3>
-        <p>Equip: ${jugador.club_team}</p>
-        <p>Preu: ${jugador.price}M</p>
-        
-        <!-- IMPORTANT: Passar SEMPRE jugador.id entre cometes -->
-        <button onclick="fitxarJugador('${jugador.id}')">Fitxar</button>
-      </div>
-    `;
-  });
-}
-let totsElsJugadorsMercat = []; // Variable global
-
-// Carregar jugadors inicials des de Supabase
-async function carregarMercat() {
-  const { data, error } = await supabase
+  if (!supabaseClient) return;
+  const { data, error } = await supabaseClient
     .from('players')
-    .select('*');
+    .select('id, name, position, current_value')
+    .limit(5);
 
-  if (!error) {
-    totsElsJugadorsMercat = data;
-    renderitzarMercat(totsElsJugadorsMercat); // Dibuixem tots d'inici
-  }
-}
-
-// Funció que s'executa quan es canvia el filtre del desplegable (onchange)
-function filtrarJugadorsPerEquip() {
-  const equipSeleccionat = document.getElementById('select-filtre-equip').value;
-
-  if (equipSeleccionat === '' || equipSeleccionat === 'tots') {
-    // Si es tria "Tots els equips", mostrem la llista completa
-    renderitzarMercat(totsElsJugadorsMercat);
-  } else {
-    // Filtrem sobre la llista global
-    const jugadorsFiltrats = totsElsJugadorsMercat.filter(
-      jugador => jugador.club_team === equipSeleccionat
-    );
-    renderitzarMercat(jugadorsFiltrats);
-  }
-}
-async function fitxarJugador(jugadorId) {
-  if (!jugadorId) {
-    alert("Error: ID de jugador no trobat.");
+  if (error) {
+    console.error('ERROR SUPABASE:', error);
     return;
   }
-
-  // Cercar el jugador a la llista global pel seu ID
-  const jugador = totsElsJugadorsMercat.find(j => j.id === jugadorId);
-
-  if (!jugador) {
-    alert("No s'ha trobat la informació d'aquest jugador.");
-    return;
-  }
-
-  // Executar la lògica de fitxatge (inserir a fantasy_team_players i restar el pressupost)
-  // ...
+  console.log('SUPABASE CONNECTAT CORRECTAMENT');
+  console.log('Jugadors:', data);
 }
-// Escolta global de clics per als botons de fitxar
-document.addEventListener('click', async (event) => {
-  // Comprova si el clic s'ha fet en un botó de fitxar (o un element intern)
-  const buyButton = event.target.closest('[data-buy-player]');
+
+testSupabaseConnection();
+
+// ============================================
+// 2. DADES I ESTAT INICIAL
+// ============================================
+const players = [
+  { id: 'J001', name: 'Arnau Puig', team: 'Alella Blau', value: 10, points: 42, bonus: false },
+  { id: 'J002', name: 'Biel Serra', team: 'Alella Blau', value: 12, points: 55, bonus: false },
+  { id: 'J003', name: 'Nil Casas', team: 'Alella Blanc', value: 9, points: 38, bonus: false },
+  { id: 'J004', name: 'Pol Ferrer', team: 'Alella Blanc', value: 11, points: 49, bonus: false },
+  { id: 'J005', name: 'Jan Soler', team: 'Maresme', value: 14, points: 63, bonus: false },
+  { id: 'J006', name: 'Pau Riera', team: 'Maresme', value: 8, points: 31, bonus: false },
+  { id: 'J007', name: 'Marc Vila', team: 'Alella Blau', value: 13, points: 58, bonus: false },
+  { id: 'J008', name: 'Èric Costa', team: 'Alella Blanc', value: 7, points: 27, bonus: false }
+];
+
+const participants = [
+  { name: 'Roger', points: 128, team: 'Els Trons' },
+  { name: 'Julia', points: 116, team: 'Les Estrelles' },
+  { name: 'Max', points: 104, team: 'Els Guerrers' }
+];
+
+const defaultMatches = [
+  { id: 'M001', home: 'Alella Blau', away: 'Alella Blanc', homeScore: 52, awayScore: 48 },
+  { id: 'M002', home: 'Maresme', away: 'Alella Blau', homeScore: 41, awayScore: 44 }
+];
+
+let roster = JSON.parse(localStorage.getItem('fantasyRoster') || '[]');
+let budget = Number(localStorage.getItem('fantasyBudget') || 120);
+let captain = localStorage.getItem('fantasyCaptain') || '';
+let matches = JSON.parse(localStorage.getItem('fantasyMatches') || 'null') || defaultMatches;
+let currentWeek = Number(localStorage.getItem('fantasyWeek') || 1);
+let adminMode = localStorage.getItem('fantasyAdmin') === '1';
+
+const $ = id => document.getElementById(id);
+const money = n => `${Number(n).toFixed(1).replace('.', ',')} M€`;
+
+function save() {
+  localStorage.setItem('fantasyRoster', JSON.stringify(roster));
+  localStorage.setItem('fantasyBudget', budget);
+  localStorage.setItem('fantasyCaptain', captain);
+  localStorage.setItem('fantasyMatches', JSON.stringify(matches));
+  localStorage.setItem('fantasyWeek', currentWeek);
+  localStorage.setItem('fantasyAdmin', adminMode ? '1' : '0');
+}
+
+// ============================================
+// 3. NAVEGACIÓ
+// ============================================
+function showSection(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.section === id));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showSection(t.dataset.section)));
+
+// ============================================
+// 4. RENDERITZAT I FILTRES
+// ============================================
+function playerCard(p, inTeam = false) {
+  if (!p) return '';
+  const initials = p.name ? p.name.split(' ').map(x => x[0]).join('').slice(0, 2) : '??';
   
-  if (buyButton) {
-    const playerId = buyButton.getAttribute('data-buy-player');
-    console.log("Intentant fitxar el jugador amb ID:", playerId);
-    
-    // Crida a la teva funció habitual per fitxar
-    if (typeof fitxarJugador === 'function') {
-      await fitxarJugador(playerId);
-    } else if (typeof buyPlayer === 'function') {
-      await buyPlayer(playerId);
-    }
+  return `
+    <article class="player-card">
+      <div class="avatar">${initials}</div>
+      <div class="player-info">
+        <h3>${p.name}</h3>
+        <span>${p.team || p.club_team || 'Sense equip'}</span>
+      </div>
+      <div class="player-meta">
+        <div><small>Valor</small><b>${money(p.value || p.price || 0)}</b></div>
+        <div><small>Punts</small><b>${p.points || 0}</b></div>
+      </div>
+      ${p.bonus ? '<div class="bonus">⭐ Bonus setmana</div>' : ''}
+      <div class="card-actions">
+        ${inTeam ? `
+          <button type="button" class="secondary" data-sell="${p.id}">Vendre</button>
+          ${captain === p.id ? '' : `<button type="button" class="secondary" data-captain="${p.id}">Fer capità</button>`}
+        ` : `
+          <button type="button" class="primary" data-buy="${p.id}" data-buy-player="${p.id}">Fitxar · ${money(p.value || p.price || 0)}</button>
+        `}
+      </div>
+    </article>
+  `;
+}
+
+function render() {
+  if ($('budget'))$('budget').textContent = money(budget);
+  if ($('rosterCount'))$('rosterCount').textContent = `${roster.length}/8`;
+  if ($('playerTotal'))$('playerTotal').textContent = players.length;
+  if ($('teamTotal'))$('teamTotal').textContent = new Set(players.map(p => p.team)).size;
+  if ($('weekLabel'))$('weekLabel').textContent = `Jornada ${currentWeek}`;
+  if ($('captainName'))$('captainName').textContent = players.find(p => p.id === captain)?.name || 'pendent';
+
+  const teams = [...new Set(players.map(p => p.team || p.club_team).filter(Boolean))];
+  const filterEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
+  if (filterEl && filterEl.children.length <= 1) {
+    filterEl.innerHTML = '<option value="">Tots els equips</option>' + teams.map(t => `<option value="${t}">${t}</option>`).join('');
+  }
+
+  renderMarket();
+  renderTeam();
+  renderRanking();
+  renderCoach();
+  renderResults();
+  renderAdmin();
+  if ($('adminStatus'))$('adminStatus').textContent = adminMode ? 'Administrador actiu' : 'Mode jugador';
+}
+
+function renderMarket() {
+  const searchEl = $('search');
+  const filterEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
+  const q = searchEl ? searchEl.value.toLowerCase().trim() : '';
+  const team = filterEl ? filterEl.value : '';
+
+  const filtered = players.filter(p => {
+    const pTeam = p.team || p.club_team || '';
+    const nameMatch = p.name.toLowerCase().includes(q) || pTeam.toLowerCase().includes(q);
+    const teamMatch = !team || team === 'tots' || pTeam === team;
+    return nameMatch && teamMatch;
+  });
+
+  const html = filtered.map(p => playerCard(p, false)).join('');
+  const marketGrid = $('marketGrid') \vert{}\vert{}$('mercat-container');
+  if (marketGrid) {
+    marketGrid.innerHTML = html || `
+      <div class="empty-state">
+        <div class="empty-icon">🔎</div>
+        <h3>No hem trobat cap jugador</h3>
+        <p>Prova un altre nom o equip.</p>
+      </div>`;
+  }
+}
+
+function renderTeam() {
+  const grid = $('teamGrid');
+  if (!grid) return;
+  if (!roster.length) {
+    grid.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👕</div>
+        <h3>Encara no tens plantilla</h3>
+        <p>Ves al mercat per començar a construir el teu equip.</p>
+        <button type="button" class="primary" data-go="market">Anar al mercat</button>
+      </div>`;
+    return;
+  }
+  grid.innerHTML = roster.map(id => playerCard(players.find(p => p.id === id), true)).join('');
+}
+
+function renderRanking() {
+  const body = $('rankingBody');
+  if (!body) return;
+  const own = { name: 'Roger', points: roster.reduce((s, id) => s + (players.find(p => p.id === id)?.points || 0), 0), team: 'La meva plantilla' };
+  const rows = [...participants, own].sort((a, b) => b.points - a.points);
+  body.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td><b>${r.points}</b></td><td>${r.team}</td></tr>`).join('');
+}
+
+function renderCoach() {
+  const select = $('coachPlayer');
+  if (!select) return;
+  select.innerHTML = players.map(p => `<option value="${p.id}">${p.name} · ${p.team || p.club_team}${p.bonus ? ' · ⭐' : ''}</option>`).join('');
+}
+
+function renderResults() {
+  if ($('resultsWeek'))$('resultsWeek').textContent = `Jornada ${currentWeek}`;
+  const list = $('resultsList');
+  if (!list) return;
+  list.innerHTML = matches.length ? matches.map(m => `
+    <div class="match">
+      <div><b>${m.home}</b><span> vs </span><b>${m.away}</b></div>
+      <strong>${m.homeScore} - ${m.awayScore}</strong>
+    </div>`).join('') : `
+    <div class="empty-state">
+      <div class="empty-icon">🏀</div>
+      <h3>Encara no hi ha resultats</h3>
+      <p>L’administrador els podrà afegir des del panell.</p>
+    </div>`;
+}
+
+function renderAdmin() {
+  if ($('adminLoginCard'))$('adminLoginCard').style.display = adminMode ? 'none' : 'block';
+  if ($('adminPanel'))$('adminPanel').style.display = adminMode ? 'block' : 'none';
+  const container = $('adminMatches');
+  if (!container) return;
+  container.innerHTML = matches.map((m, i) => `
+    <div class="admin-match">
+      <div class="admin-match-row">
+        <input data-match-home="${i}" value="${m.home}">
+        <input class="score" type="number" min="0" data-match-hs="${i}" value="${m.homeScore}">
+        <span>–</span>
+        <input class="score" type="number" min="0" data-match-as="${i}" value="${m.awayScore}">
+        <input data-match-away="${i}" value="${m.away}">
+        <button type="button" class="secondary danger" data-delete-match="${i}">Eliminar</button>
+      </div>
+    </div>`).join('');
+}
+
+// ============================================
+// 5. DELEGACIÓ GLOBAL D'ESDEVENIMENTS (SOLUCIÓ DELS FILTRES)
+// ============================================
+
+// Escolta global per als camps de cerca i filtre
+if ($('search'))$('search').addEventListener('input', renderMarket);
+if ($('teamFilter'))$('teamFilter').addEventListener('change', renderMarket);
+if ($('select-filtre-equip'))$('select-filtre-equip').addEventListener('change', renderMarket);
+
+// Delegació de clics: Funciona SEMPRE, fins i tot després de filtrar o re-renderitzar l'HTML!
+document.addEventListener('click', async (e) => {
+  const target = e.target.closest('button, [data-buy], [data-buy-player], [data-sell], [data-captain], [data-go], [data-delete-match]');
+  if (!target) return;
+
+  // Acció de Fitxar
+  const buyId = target.dataset.buy || target.dataset.buyPlayer || target.getAttribute('data-buy-player');
+  if (buyId) {
+    buy(buyId);
+    return;
+  }
+
+  // Acció de Vendre
+  if (target.dataset.sell) {
+    sell(target.dataset.sell);
+    return;
+  }
+
+  // Fer Capità
+  if (target.dataset.captain) {
+    captain = target.dataset.captain;
+    save();
+    render();
+    return;
+  }
+
+  // Canvi de pestanya
+  if (target.dataset.go) {
+    showSection(target.dataset.go);
+    return;
+  }
+
+  // Eliminar partit des del panell d'Admin
+  if (target.dataset.deleteMatch !== undefined) {
+    const idx = Number(target.dataset.deleteMatch);
+    matches.splice(idx, 1);
+    save();
+    render();
+    return;
   }
 });
+
+// Escolta de canvis als camps editable d'administració
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.matchHome !== undefined) { matches[Number(t.dataset.matchHome)].home = t.value; save(); }
+  if (t.dataset.matchAway !== undefined) { matches[Number(t.dataset.matchAway)].away = t.value; save(); }
+  if (t.dataset.matchHs !== undefined) { matches[Number(t.dataset.matchHs)].homeScore = Number(t.value) || 0; save(); }
+  if (t.dataset.matchAs !== undefined) { matches[Number(t.dataset.matchAs)].awayScore = Number(t.value) || 0; save(); }
+});
+
+// ============================================
+// 6. LÒGICA DE NEGOCI (FITXAR, VENDRE, ADMIN)
+// ============================================
+function buy(id) {
+  const p = players.find(x => x.id === id);
+  if (!p) return alert('Jugador no trobat.');
+  if (roster.includes(id)) return alert('Aquest jugador ja forma part de la plantilla.');
+  if (roster.length >= 8) return alert('La plantilla ja té 8 jugadors.');
+
+  const pTeam = p.team || p.club_team;
+  const sameTeamCount = roster.filter(x => {
+    const rPlayer = players.find(player => player.id === x);
+    return (rPlayer?.team || rPlayer?.club_team) === pTeam;
+  }).length;
+
+  if (sameTeamCount >= 2) return alert('No pots tenir més de 2 jugadors del mateix equip.');
+
+  const price = p.value || p.price || 0;
+  if (budget < price) return alert('No tens prou pressupost.');
+
+  roster.push(id);
+  budget -= price;
+  save();
+  render();
+  showSection('team');
+}
+
+function sell(id) {
+  const p = players.find(x => x.id === id);
+  if (!p) return;
+  roster = roster.filter(x => x !== id);
+  budget += (p.value || p.price || 0);
+  if (captain === id) captain = '';
+  save();
+  render();
+}
+
+function applyBonus() {
+  const select = $('coachPlayer');
+  if (!select) return;
+  const p = players.find(player => player.id === select.value);
+  if (!p) return;
+
+  if (p.bonus) {
+    if ($('coachMessage'))$('coachMessage').innerHTML = '⚠️ Aquest jugador ja ha rebut el bonus de prova.';
+    return;
+  }
+  p.bonus = true;
+  p.points += 10;
+  p.value += 0.5;
+  if ($('coachMessage'))$('coachMessage').innerHTML = `✅ <b>${p.name}</b> ha rebut el bonus: +10 punts i +0,5 M€.`;
+  render();
+}
+
+function loginAdmin() {
+  if ($('adminPin') &&$('adminPin').value === '1234') {
+    adminMode = true;
+    save();
+    render();
+  } else if ($('adminLoginMessage')) {$('adminLoginMessage').textContent = 'PIN incorrecte. En aquesta demo el PIN és 1234.';
+  }
+}
+
+function logoutAdmin() {
+  adminMode = false;
+  save();
+  render();
+  showSection('home');
+}
+
+function addMatch() {
+  matches.push({ id: 'M' + Date.now(), home: 'Equip local', away: 'Equip visitant', homeScore: 0, awayScore: 0 });
+  save();
+  render();
+  showSection('admin');
+}
+
+function nextWeek() {
+  currentWeek++;
+  matches = [];
+  save();
+  render();
+}
+
+// Inicialització de botons d'administració
+if ($('adminLoginBtn'))$('adminLoginBtn').onclick = loginAdmin;
+if ($('adminLogoutBtn'))$('adminLogoutBtn').onclick = logoutAdmin;
+if ($('addMatchBtn'))$('addMatchBtn').onclick = addMatch;
+if ($('nextWeekBtn'))$('nextWeekBtn').onclick = nextWeek;
+if ($('bonusBtn'))$('bonusBtn').onclick = applyBonus;
+
+// Renderitzat inicial
+render();
