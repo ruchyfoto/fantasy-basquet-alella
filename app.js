@@ -334,5 +334,4 @@ async function carregarJugadorsSupabase() {
 // INICIALITZACIÓ
 render();
 carregarJugadorsSupabase();
-<!-- Canvia ?v=1 a ?v=2 cada vegada que modifiquis app.js -->
-<script src="app.js?v=2"></script>
+
