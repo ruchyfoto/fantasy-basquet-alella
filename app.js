@@ -52,31 +52,37 @@ function showSection(id) {
 }
 
 // 3. TARGETA DE JUGADOR (COMPATIBLE AMB TOTS ELS ATRIBUTS)
+// 1. DIBUIXAR TARGETA DE JUGADOR (AMB ELS CAMPS REALS DE SUPABASE)
 function playerCard(p, inTeam = false) {
   if (!p) return '';
+  
   const pId = String(p.id);
-  const initials = p.name ? p.name.split(' ').map(x => x[0]).join('').slice(0, 2) : '??';
-  const val = p.value || p.price || p.current_value || 0;
-  const pTeam = p.team || p.club_team || 'Sense equip';
+  // Unim nom i cognom
+  const fullName = `${p.name || ''} ${p.surname || ''}`.trim() || 'Sense nom';
+  const initials = fullName.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
+  
+  // Camp de valor real: current_value
+  const val = p.current_value || p.value || 0;
+  // Equip real: real_team_id
+  const teamLabel = p.real_team_id ? `Equip ${p.real_team_id}` : 'Sense equip';
 
   return `
     <article class="player-card">
       <div class="avatar">${initials}</div>
       <div class="player-info">
-        <h3>${p.name}</h3>
-        <span>${pTeam}</span>
+        <h3>${fullName}</h3>
+        <span>${teamLabel} · ${p.category || 'Sense cat.'}</span>
       </div>
       <div class="player-meta">
         <div><small>Valor</small><b>${money(val)}</b></div>
-        <div><small>Punts</small><b>${p.points || 0}</b></div>
+        <div><small>Dorsal</small><b>#${p.shirt_number || '-'}</b></div>
       </div>
-      ${p.bonus ? '<div class="bonus">⭐ Bonus setmana</div>' : ''}
       <div class="card-actions">
         ${inTeam ? `
-          <button type="button" class="secondary" data-sell="${pId}">Vendre</button>
-          ${String(captain) === pId ? '' : `<button type="button" class="secondary" data-captain="${pId}">Fer capità</button>`}
+          <button type="button" class="secondary" onclick="sell('${pId}')">Vendre</button>
+          ${String(captain) === pId ? '' : `<button type="button" class="secondary" onclick="setCaptain('${pId}')">Fer capità</button>`}
         ` : `
-          <button type="button" class="primary" data-buy="${pId}" data-buy-player="${pId}">Fitxar · ${money(val)}</button>
+          <button type="button" class="primary" onclick="buy('${pId}')">Fitxar · ${money(val)}</button>
         `}
       </div>
     </article>
@@ -110,7 +116,7 @@ function render() {
   if ($('adminStatus'))$('adminStatus').textContent = adminMode ? 'Administrador actiu' : 'Mode jugador';
 }
 
-// 5. MERCAT AMB FILTRES MULTICRITERI (EQUIP, ENTRENADOR/POSICIÓ I CERCA)
+// 2. FILTRAR PER NOM, EQUIP I CATEGORIA/POSICIÓ
 function renderMarket() {
   const searchEl = $('search');
   const teamEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
@@ -121,18 +127,21 @@ function renderMarket() {
   const pos = posEl ? posEl.value : '';
 
   const filtered = players.filter(p => {
-    const pTeam = p.team || p.club_team || '';
-    const pPos = p.position || p.role || '';
+    const fullName = `${p.name || ''} ${p.surname || ''}`.toLowerCase();
+    const pTeam = String(p.real_team_id || p.team || '');
+    // Utilitzem category si position és NULL
+    const pPos = (p.position || p.category || '').toLowerCase();
 
-    const nameMatch = !q || p.name.toLowerCase().includes(q) || pTeam.toLowerCase().includes(q);
-    const teamMatch = !team || team === 'tots' || pTeam === team;
-    const posMatch = !pos || pos === 'tots' || pPos.toLowerCase() === pos.toLowerCase();
+    const nameMatch = !q || fullName.includes(q);
+    const teamMatch = !team || team === 'tots' || pTeam === String(team);
+    const posMatch = !pos || pos === 'tots' || pPos.includes(pos.toLowerCase());
 
     return nameMatch && teamMatch && posMatch;
   });
 
   const html = filtered.map(p => playerCard(p, false)).join('');
   const grid = $('marketGrid') \vert{}\vert{}$('mercat-container');
+  
   if (grid) {
     grid.innerHTML = html || `
       <div class="empty-state">
@@ -142,7 +151,6 @@ function renderMarket() {
       </div>`;
   }
 }
-
 function renderTeam() {
   const grid = $('teamGrid');
   if (!grid) return;
@@ -208,24 +216,43 @@ function renderAdmin() {
 }
 
 // 6. OPERACIONS (FITXAR I VENDRE AMB CONVERSIÓ DE TIPUS)
+// 3. FITXAR AMB CONVERSIÓ D'ID NUMÈRIC I CAMPS REALS
 function buy(id) {
+  // Compara String(21) amb String("21")
   const p = players.find(x => String(x.id) === String(id));
-  if (!p) return alert("No s'ha trobat la informació d'aquest jugador.");
+
+  if (!p) {
+    console.error("Jugador no trobat amb ID:", id, "a la llista:", players);
+    return alert("No s'ha trobat la informació d'aquest jugador.");
+  }
 
   const pIdStr = String(p.id);
-  if (roster.some(rId => String(rId) === pIdStr)) return alert('Aquest jugador ja forma part de la plantilla.');
-  if (roster.length >= 8) return alert('La plantilla ja té 8 jugadors.');
+  if (roster.some(rId => String(rId) === pIdStr)) {
+    return alert('Aquest jugador ja forma part de la plantilla.');
+  }
 
-  const pTeam = p.team || p.club_team;
-  const sameTeamCount = roster.filter(rId => {
-    const rPlayer = players.find(player => String(player.id) === String(rId));
-    return (rPlayer?.team || rPlayer?.club_team) === pTeam;
-  }).length;
+  if (roster.length >= 8) {
+    return alert('La plantilla ja té 8 jugadors.');
+  }
 
-  if (sameTeamCount >= 2) return alert('No pots tenir més de 2 jugadors del mateix equip.');
+  // Límit per equip utilitzant real_team_id
+  const pTeam = p.real_team_id;
+  if (pTeam) {
+    const sameTeamCount = roster.filter(rId => {
+      const rPlayer = players.find(player => String(player.id) === String(rId));
+      return rPlayer && rPlayer.real_team_id === pTeam;
+    }).length;
 
-  const price = p.value || p.price || p.current_value || 0;
-  if (budget < price) return alert('No tens prou pressupost.');
+    if (sameTeamCount >= 2) {
+      return alert('No pots tenir més de 2 jugadors del mateix equip.');
+    }
+  }
+
+  // Preu usant current_value
+  const price = p.current_value || p.value || 0;
+  if (budget < price) {
+    return alert('No tens prou pressupost.');
+  }
 
   roster.push(p.id);
   budget -= price;
@@ -233,7 +260,6 @@ function buy(id) {
   render();
   showSection('team');
 }
-
 function sell(id) {
   const idStr = String(id);
   const p = players.find(x => String(x.id) === idStr);
