@@ -1,43 +1,17 @@
 // ============================================
-// 1. CONFIGURACIÓ I CONNEXIÓ SUPABASE
+// FANTASY APP - FITXER COMPLET I NET (app.js)
 // ============================================
-const SUPABASE_URL = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpudWptdWdvbm1manlhbHlnZmFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4NTYzMzUsImV4cCI6MjEwNTQzMjMzNX0.VF4b7w5dJ_7GUtvO_7TNfw_Mvi7QfsBC17tvFn26YHk'; // Canvia-ho per la teva URL si en fas servir
-const SUPABASE_ANON_KEY = 'sb_publishable_xRj1AZ-BzIm-2_eXg0PU8g_NqljVrF'; // Canvia-ho per la teva clau
 
-let supabaseClient = null;
-if (window.supabase) {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
-
-async function testSupabaseConnection() {
-  if (!supabaseClient) return;
-  const { data, error } = await supabaseClient
-    .from('players')
-    .select('id, name, position, current_value')
-    .limit(5);
-
-  if (error) {
-    console.error('ERROR SUPABASE:', error);
-    return;
-  }
-  console.log('SUPABASE CONNECTAT CORRECTAMENT');
-  console.log('Jugadors:', data);
-}
-
-testSupabaseConnection();
-
-// ============================================
-// 2. DADES I ESTAT INICIAL
-// ============================================
-const players = [
-  { id: 'J001', name: 'Arnau Puig', team: 'Alella Blau', value: 10, points: 42, bonus: false },
-  { id: 'J002', name: 'Biel Serra', team: 'Alella Blau', value: 12, points: 55, bonus: false },
-  { id: 'J003', name: 'Nil Casas', team: 'Alella Blanc', value: 9, points: 38, bonus: false },
-  { id: 'J004', name: 'Pol Ferrer', team: 'Alella Blanc', value: 11, points: 49, bonus: false },
-  { id: 'J005', name: 'Jan Soler', team: 'Maresme', value: 14, points: 63, bonus: false },
-  { id: 'J006', name: 'Pau Riera', team: 'Maresme', value: 8, points: 31, bonus: false },
-  { id: 'J007', name: 'Marc Vila', team: 'Alella Blau', value: 13, points: 58, bonus: false },
-  { id: 'J008', name: 'Èric Costa', team: 'Alella Blanc', value: 7, points: 27, bonus: false }
+// 1. VARIABLES D'ESTAT I JUGADORS INICIALS
+let players = [
+  { id: 'J001', name: 'Arnau Puig', team: 'Alella Blau', value: 10, points: 42, bonus: false, position: 'Jugador' },
+  { id: 'J002', name: 'Biel Serra', team: 'Alella Blau', value: 12, points: 55, bonus: false, position: 'Jugador' },
+  { id: 'J003', name: 'Nil Casas', team: 'Alella Blanc', value: 9, points: 38, bonus: false, position: 'Jugador' },
+  { id: 'J004', name: 'Pol Ferrer', team: 'Alella Blanc', value: 11, points: 49, bonus: false, position: 'Jugador' },
+  { id: 'J005', name: 'Jan Soler', team: 'Maresme', value: 14, points: 63, bonus: false, position: 'Jugador' },
+  { id: 'J006', name: 'Pau Riera', team: 'Maresme', value: 8, points: 31, bonus: false, position: 'Jugador' },
+  { id: 'J007', name: 'Marc Vila', team: 'Alella Blau', value: 13, points: 58, bonus: false, position: 'Jugador' },
+  { id: 'J008', name: 'Èric Costa', team: 'Alella Blanc', value: 7, points: 27, bonus: false, position: 'Jugador' }
 ];
 
 const participants = [
@@ -70,68 +44,62 @@ function save() {
   localStorage.setItem('fantasyAdmin', adminMode ? '1' : '0');
 }
 
-// ============================================
-// 3. NAVEGACIÓ
-// ============================================
+// 2. MOSTRAR SECCIONS
 function showSection(id) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.section === id));
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showSection(t.dataset.section)));
-
-// ============================================
-// 4. RENDERITZAT I FILTRES
-// ============================================
+// 3. TARGETA DE JUGADOR (COMPATIBLE AMB TOTS ELS ATRIBUTS)
 function playerCard(p, inTeam = false) {
   if (!p) return '';
+  const pId = String(p.id);
   const initials = p.name ? p.name.split(' ').map(x => x[0]).join('').slice(0, 2) : '??';
-  
-  // Guardem l'ID assegurant que no doni problemes si és número o text
-  const playerId = p.id;
-  const price = p.value || p.price || p.current_value || 0;
+  const val = p.value || p.price || p.current_value || 0;
+  const pTeam = p.team || p.club_team || 'Sense equip';
 
   return `
     <article class="player-card">
       <div class="avatar">${initials}</div>
       <div class="player-info">
         <h3>${p.name}</h3>
-        <span>${p.team || p.club_team || 'Sense equip'}</span>
+        <span>${pTeam}</span>
       </div>
       <div class="player-meta">
-        <div><small>Valor</small><b>${money(price)}</b></div>
+        <div><small>Valor</small><b>${money(val)}</b></div>
         <div><small>Punts</small><b>${p.points || 0}</b></div>
       </div>
       ${p.bonus ? '<div class="bonus">⭐ Bonus setmana</div>' : ''}
       <div class="card-actions">
         ${inTeam ? `
-          <button type="button" class="secondary" onclick="sell('${playerId}')">Vendre</button>
-          ${captain === playerId ? '' : `<button type="button" class="secondary" onclick="setCaptain('${playerId}')">Fer capità</button>`}
+          <button type="button" class="secondary" data-sell="${pId}">Vendre</button>
+          ${String(captain) === pId ? '' : `<button type="button" class="secondary" data-captain="${pId}">Fer capità</button>`}
         ` : `
-          <!-- ONCLICK DIRECTE: No falla mai en filtrar -->
-          <button type="button" class="primary" onclick="buy('${playerId}')">
-            Fitxar · ${money(price)}
-          </button>
+          <button type="button" class="primary" data-buy="${pId}" data-buy-player="${pId}">Fitxar · ${money(val)}</button>
         `}
       </div>
     </article>
   `;
 }
 
+// 4. RENDERITZAT GENERAL
 function render() {
   if ($('budget'))$('budget').textContent = money(budget);
   if ($('rosterCount'))$('rosterCount').textContent = `${roster.length}/8`;
   if ($('playerTotal'))$('playerTotal').textContent = players.length;
-  if ($('teamTotal'))$('teamTotal').textContent = new Set(players.map(p => p.team)).size;
+  if ($('teamTotal'))$('teamTotal').textContent = new Set(players.map(p => p.team || p.club_team)).size;
   if ($('weekLabel'))$('weekLabel').textContent = `Jornada ${currentWeek}`;
-  if ($('captainName'))$('captainName').textContent = players.find(p => p.id === captain)?.name || 'pendent';
+  if ($('captainName'))$('captainName').textContent = players.find(p => String(p.id) === String(captain))?.name || 'pendent';
 
+  // Poblar desplegable d'equips si no s'ha fet
   const teams = [...new Set(players.map(p => p.team || p.club_team).filter(Boolean))];
-  const filterEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
-  if (filterEl && filterEl.children.length <= 1) {
-    filterEl.innerHTML = '<option value="">Tots els equips</option>' + teams.map(t => `<option value="${t}">${t}</option>`).join('');
-  }
+  ['teamFilter', 'select-filtre-equip'].forEach(filterId => {
+    const el = $(filterId);
+    if (el && el.children.length <= 1) {
+      el.innerHTML = '<option value="">Tots els equips</option>' + teams.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+  });
 
   renderMarket();
   renderTeam();
@@ -142,6 +110,7 @@ function render() {
   if ($('adminStatus'))$('adminStatus').textContent = adminMode ? 'Administrador actiu' : 'Mode jugador';
 }
 
+// 5. MERCAT AMB FILTRES MULTICRITERI (EQUIP, ENTRENADOR/POSICIÓ I CERCA)
 function renderMarket() {
   const searchEl = $('search');
   const teamEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
@@ -155,7 +124,7 @@ function renderMarket() {
     const pTeam = p.team || p.club_team || '';
     const pPos = p.position || p.role || '';
 
-    const nameMatch = p.name.toLowerCase().includes(q) || pTeam.toLowerCase().includes(q);
+    const nameMatch = !q || p.name.toLowerCase().includes(q) || pTeam.toLowerCase().includes(q);
     const teamMatch = !team || team === 'tots' || pTeam === team;
     const posMatch = !pos || pos === 'tots' || pPos.toLowerCase() === pos.toLowerCase();
 
@@ -163,24 +132,16 @@ function renderMarket() {
   });
 
   const html = filtered.map(p => playerCard(p, false)).join('');
-  const marketGrid = $('marketGrid') \vert{}\vert{}$('mercat-container');
-  
-  if (marketGrid) {
-    marketGrid.innerHTML = html || `
+  const grid = $('marketGrid') \vert{}\vert{}$('mercat-container');
+  if (grid) {
+    grid.innerHTML = html || `
       <div class="empty-state">
         <div class="empty-icon">🔎</div>
         <h3>No hem trobat cap jugador</h3>
-        <p>Prova un altre nom, equip o posició.</p>
+        <p>Prova un altre nom, equip o filtre.</p>
       </div>`;
   }
 }
-
-// Vincula els esdeveniments dels desplegables de filtrat
-if ($('search'))$('search').oninput = renderMarket;
-if ($('teamFilter'))$('teamFilter').onchange = renderMarket;
-if ($('select-filtre-equip'))$('select-filtre-equip').onchange = renderMarket;
-if ($('positionFilter'))$('positionFilter').onchange = renderMarket;
-if ($('select-filtre-posicio'))$('select-filtre-posicio').onchange = renderMarket;
 
 function renderTeam() {
   const grid = $('teamGrid');
@@ -195,13 +156,13 @@ function renderTeam() {
       </div>`;
     return;
   }
-  grid.innerHTML = roster.map(id => playerCard(players.find(p => p.id === id), true)).join('');
+  grid.innerHTML = roster.map(id => playerCard(players.find(p => String(p.id) === String(id)), true)).join('');
 }
 
 function renderRanking() {
   const body = $('rankingBody');
   if (!body) return;
-  const own = { name: 'Roger', points: roster.reduce((s, id) => s + (players.find(p => p.id === id)?.points || 0), 0), team: 'La meva plantilla' };
+  const own = { name: 'Roger', points: roster.reduce((s, id) => s + (players.find(p => String(p.id) === String(id))?.points || 0), 0), team: 'La meva plantilla' };
   const rows = [...participants, own].sort((a, b) => b.points - a.points);
   body.innerHTML = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${r.name}</td><td><b>${r.points}</b></td><td>${r.team}</td></tr>`).join('');
 }
@@ -246,84 +207,18 @@ function renderAdmin() {
     </div>`).join('');
 }
 
-// ============================================
-// 5. DELEGACIÓ GLOBAL D'ESDEVENIMENTS (SOLUCIÓ DELS FILTRES)
-// ============================================
-
-// Escolta global per als camps de cerca i filtre
-if ($('search'))$('search').addEventListener('input', renderMarket);
-if ($('teamFilter'))$('teamFilter').addEventListener('change', renderMarket);
-if ($('select-filtre-equip'))$('select-filtre-equip').addEventListener('change', renderMarket);
-
-// Delegació de clics: Funciona SEMPRE, fins i tot després de filtrar o re-renderitzar l'HTML!
-document.addEventListener('click', async (e) => {
-  const target = e.target.closest('button, [data-buy], [data-buy-player], [data-sell], [data-captain], [data-go], [data-delete-match]');
-  if (!target) return;
-
-  // Acció de Fitxar
-  const buyId = target.dataset.buy || target.dataset.buyPlayer || target.getAttribute('data-buy-player');
-  if (buyId) {
-    buy(buyId);
-    return;
-  }
-
-  // Acció de Vendre
-  if (target.dataset.sell) {
-    sell(target.dataset.sell);
-    return;
-  }
-
-  // Fer Capità
-  if (target.dataset.captain) {
-    captain = target.dataset.captain;
-    save();
-    render();
-    return;
-  }
-
-  // Canvi de pestanya
-  if (target.dataset.go) {
-    showSection(target.dataset.go);
-    return;
-  }
-
-  // Eliminar partit des del panell d'Admin
-  if (target.dataset.deleteMatch !== undefined) {
-    const idx = Number(target.dataset.deleteMatch);
-    matches.splice(idx, 1);
-    save();
-    render();
-    return;
-  }
-});
-
-// Escolta de canvis als camps editable d'administració
-document.addEventListener('change', (e) => {
-  const t = e.target;
-  if (t.dataset.matchHome !== undefined) { matches[Number(t.dataset.matchHome)].home = t.value; save(); }
-  if (t.dataset.matchAway !== undefined) { matches[Number(t.dataset.matchAway)].away = t.value; save(); }
-  if (t.dataset.matchHs !== undefined) { matches[Number(t.dataset.matchHs)].homeScore = Number(t.value) || 0; save(); }
-  if (t.dataset.matchAs !== undefined) { matches[Number(t.dataset.matchAs)].awayScore = Number(t.value) || 0; save(); }
-});
-
-// ============================================
-// 6. LÒGICA DE NEGOCI (FITXAR, VENDRE, ADMIN)
-// ============================================
+// 6. OPERACIONS (FITXAR I VENDRE AMB CONVERSIÓ DE TIPUS)
 function buy(id) {
-  // Cerquem el jugador convertint ambdós IDs a String
   const p = players.find(x => String(x.id) === String(id));
+  if (!p) return alert("No s'ha trobat la informació d'aquest jugador.");
 
-  if (!p) {
-    console.error("Jugador no trobat amb ID:", id);
-    return alert("No s'ha trobat la informació d'aquest jugador.");
-  }
-
-  if (roster.includes(p.id)) return alert('Aquest jugador ja forma part de la plantilla.');
+  const pIdStr = String(p.id);
+  if (roster.some(rId => String(rId) === pIdStr)) return alert('Aquest jugador ja forma part de la plantilla.');
   if (roster.length >= 8) return alert('La plantilla ja té 8 jugadors.');
 
   const pTeam = p.team || p.club_team;
-  const sameTeamCount = roster.filter(x => {
-    const rPlayer = players.find(player => String(player.id) === String(x));
+  const sameTeamCount = roster.filter(rId => {
+    const rPlayer = players.find(player => String(player.id) === String(rId));
     return (rPlayer?.team || rPlayer?.club_team) === pTeam;
   }).length;
 
@@ -338,81 +233,78 @@ function buy(id) {
   render();
   showSection('team');
 }
+
 function sell(id) {
-  const p = players.find(x => x.id === id);
-  if (!p) return;
-  roster = roster.filter(x => x !== id);
-  budget += (p.value || p.price || 0);
-  if (captain === id) captain = '';
+  const idStr = String(id);
+  const p = players.find(x => String(x.id) === idStr);
+  roster = roster.filter(x => String(x) !== idStr);
+  if (p) budget += (p.value || p.price || p.current_value || 0);
+  if (String(captain) === idStr) captain = '';
   save();
   render();
 }
 
-function applyBonus() {
-  const select = $('coachPlayer');
-  if (!select) return;
-  const p = players.find(player => player.id === select.value);
-  if (!p) return;
+window.buy = buy;
+window.sell = sell;
 
-  if (p.bonus) {
-    if ($('coachMessage'))$('coachMessage').innerHTML = '⚠️ Aquest jugador ja ha rebut el bonus de prova.';
-    return;
-  }
-  p.bonus = true;
-  p.points += 10;
-  p.value += 0.5;
-  if ($('coachMessage'))$('coachMessage').innerHTML = `✅ <b>${p.name}</b> ha rebut el bonus: +10 punts i +0,5 M€.`;
-  render();
-}
-
-function loginAdmin() {
-  if ($('adminPin') &&$('adminPin').value === '1234') {
-    adminMode = true;
-    save();
-    render();
-  } else if ($('adminLoginMessage')) {$('adminLoginMessage').textContent = 'PIN incorrecte. En aquesta demo el PIN és 1234.';
-  }
-}
-
-function logoutAdmin() {
-  adminMode = false;
-  save();
-  render();
-  showSection('home');
-}
-
-function addMatch() {
-  matches.push({ id: 'M' + Date.now(), home: 'Equip local', away: 'Equip visitant', homeScore: 0, awayScore: 0 });
-  save();
-  render();
-  showSection('admin');
-}
-
-function nextWeek() {
-  currentWeek++;
-  matches = [];
-  save();
-  render();
-}
-
-// Inicialització de botons d'administració
-if ($('adminLoginBtn'))$('adminLoginBtn').onclick = loginAdmin;
-if ($('adminLogoutBtn'))$('adminLogoutBtn').onclick = logoutAdmin;
-if ($('addMatchBtn'))$('addMatchBtn').onclick = addMatch;
-if ($('nextWeekBtn'))$('nextWeekBtn').onclick = nextWeek;
-if ($('bonusBtn'))$('bonusBtn').onclick = applyBonus;
-
-// Renderitzat inicial
-render();
-// Escolta global de clics (funciona sempre, inclús amb el filtre actiu)
+// 7. ESCOLTADORS GLOBALS (CAPTURA SEMPRE ELS CLICS EN BOTONS RE-RENDERITZATS)
 document.addEventListener('click', (e) => {
   const btnBuy = e.target.closest('[data-buy], [data-buy-player]');
   const btnSell = e.target.closest('[data-sell]');
+  const btnCap = e.target.closest('[data-captain]');
+  const btnGo = e.target.closest('[data-go]');
+  const tab = e.target.closest('.tab');
 
+  if (tab) {
+    showSection(tab.dataset.section);
+    return;
+  }
   if (btnBuy) {
     const id = btnBuy.dataset.buy || btnBuy.dataset.buyPlayer || btnBuy.getAttribute('data-buy-player');
     buy(id);
-  } else if (btnSell) {
+    return;
+  }
+  if (btnSell) {
     sell(btnSell.dataset.sell);
+    return;
+  }
+  if (btnCap) {
+    captain = btnCap.dataset.captain;
+    save();
+    render();
+    return;
+  }
+  if (btnGo) {
+    showSection(btnGo.dataset.go);
+    return;
   }
 });
+
+// Vincular esdeveniments a tots els desplegables de cerca i filtres
+['search', 'teamFilter', 'select-filtre-equip', 'positionFilter', 'select-filtre-posicio'].forEach(id => {
+  const el = $(id);
+  if (el) {
+    el.addEventListener('input', renderMarket);
+    el.addEventListener('change', renderMarket);
+  }
+});
+
+// 8. CARREGA DE JUGADORS DES DE SUPABASE (SI ESTÀ CONFIGURAT)
+async function carregarJugadorsSupabase() {
+  if (window.supabase && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) {
+    try {
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data, error } = await client.from('players').select('*');
+      if (!error && data && data.length > 0) {
+        players = data;
+        render();
+      }
+    } catch (err) {
+      console.warn("Carregant llista de jugadors locals.");
+    }
+  }
+}
+
+// INICIALITZACIÓ
+render();
+carregarJugadorsSupabase();
