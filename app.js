@@ -88,6 +88,10 @@ function playerCard(p, inTeam = false) {
   if (!p) return '';
   const initials = p.name ? p.name.split(' ').map(x => x[0]).join('').slice(0, 2) : '??';
   
+  // Guardem l'ID assegurant que no doni problemes si és número o text
+  const playerId = p.id;
+  const price = p.value || p.price || p.current_value || 0;
+
   return `
     <article class="player-card">
       <div class="avatar">${initials}</div>
@@ -96,16 +100,19 @@ function playerCard(p, inTeam = false) {
         <span>${p.team || p.club_team || 'Sense equip'}</span>
       </div>
       <div class="player-meta">
-        <div><small>Valor</small><b>${money(p.value || p.price || 0)}</b></div>
+        <div><small>Valor</small><b>${money(price)}</b></div>
         <div><small>Punts</small><b>${p.points || 0}</b></div>
       </div>
       ${p.bonus ? '<div class="bonus">⭐ Bonus setmana</div>' : ''}
       <div class="card-actions">
         ${inTeam ? `
-          <button type="button" class="secondary" data-sell="${p.id}">Vendre</button>
-          ${captain === p.id ? '' : `<button type="button" class="secondary" data-captain="${p.id}">Fer capità</button>`}
+          <button type="button" class="secondary" onclick="sell('${playerId}')">Vendre</button>
+          ${captain === playerId ? '' : `<button type="button" class="secondary" onclick="setCaptain('${playerId}')">Fer capità</button>`}
         ` : `
-          <button type="button" class="primary" data-buy="${p.id}" data-buy-player="${p.id}">Fitxar · ${money(p.value || p.price || 0)}</button>
+          <!-- ONCLICK DIRECTE: No falla mai en filtrar -->
+          <button type="button" class="primary" onclick="buy('${playerId}')">
+            Fitxar · ${money(price)}
+          </button>
         `}
       </div>
     </article>
@@ -137,28 +144,43 @@ function render() {
 
 function renderMarket() {
   const searchEl = $('search');
-  const filterEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
+  const teamEl = $('teamFilter') \vert{}\vert{}$('select-filtre-equip');
+  const posEl = $('positionFilter') || $('select-filtre-posicio') \vert{}\vert{}$('roleFilter');
+
   const q = searchEl ? searchEl.value.toLowerCase().trim() : '';
-  const team = filterEl ? filterEl.value : '';
+  const team = teamEl ? teamEl.value : '';
+  const pos = posEl ? posEl.value : '';
 
   const filtered = players.filter(p => {
     const pTeam = p.team || p.club_team || '';
+    const pPos = p.position || p.role || '';
+
     const nameMatch = p.name.toLowerCase().includes(q) || pTeam.toLowerCase().includes(q);
     const teamMatch = !team || team === 'tots' || pTeam === team;
-    return nameMatch && teamMatch;
+    const posMatch = !pos || pos === 'tots' || pPos.toLowerCase() === pos.toLowerCase();
+
+    return nameMatch && teamMatch && posMatch;
   });
 
   const html = filtered.map(p => playerCard(p, false)).join('');
   const marketGrid = $('marketGrid') \vert{}\vert{}$('mercat-container');
+  
   if (marketGrid) {
     marketGrid.innerHTML = html || `
       <div class="empty-state">
         <div class="empty-icon">🔎</div>
         <h3>No hem trobat cap jugador</h3>
-        <p>Prova un altre nom o equip.</p>
+        <p>Prova un altre nom, equip o posició.</p>
       </div>`;
   }
 }
+
+// Vincula els esdeveniments dels desplegables de filtrat
+if ($('search'))$('search').oninput = renderMarket;
+if ($('teamFilter'))$('teamFilter').onchange = renderMarket;
+if ($('select-filtre-equip'))$('select-filtre-equip').onchange = renderMarket;
+if ($('positionFilter'))$('positionFilter').onchange = renderMarket;
+if ($('select-filtre-posicio'))$('select-filtre-posicio').onchange = renderMarket;
 
 function renderTeam() {
   const grid = $('teamGrid');
@@ -288,29 +310,34 @@ document.addEventListener('change', (e) => {
 // 6. LÒGICA DE NEGOCI (FITXAR, VENDRE, ADMIN)
 // ============================================
 function buy(id) {
-  const p = players.find(x => x.id === id);
-  if (!p) return alert('Jugador no trobat.');
-  if (roster.includes(id)) return alert('Aquest jugador ja forma part de la plantilla.');
+  // Cerquem el jugador convertint ambdós IDs a String
+  const p = players.find(x => String(x.id) === String(id));
+
+  if (!p) {
+    console.error("Jugador no trobat amb ID:", id);
+    return alert("No s'ha trobat la informació d'aquest jugador.");
+  }
+
+  if (roster.includes(p.id)) return alert('Aquest jugador ja forma part de la plantilla.');
   if (roster.length >= 8) return alert('La plantilla ja té 8 jugadors.');
 
   const pTeam = p.team || p.club_team;
   const sameTeamCount = roster.filter(x => {
-    const rPlayer = players.find(player => player.id === x);
+    const rPlayer = players.find(player => String(player.id) === String(x));
     return (rPlayer?.team || rPlayer?.club_team) === pTeam;
   }).length;
 
   if (sameTeamCount >= 2) return alert('No pots tenir més de 2 jugadors del mateix equip.');
 
-  const price = p.value || p.price || 0;
+  const price = p.value || p.price || p.current_value || 0;
   if (budget < price) return alert('No tens prou pressupost.');
 
-  roster.push(id);
+  roster.push(p.id);
   budget -= price;
   save();
   render();
   showSection('team');
 }
-
 function sell(id) {
   const p = players.find(x => x.id === id);
   if (!p) return;
