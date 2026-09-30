@@ -463,7 +463,7 @@ function renderMarketBanner(){
   else if(m&&m.closes_at){ const t=new Date(m.closes_at), h=(t-new Date())/36e5; el.className='market-banner'+(h<24?' soon':''); el.innerHTML=`${h<24?'⏳':'🟢'} <b>Mercat obert</b> fins al ${fmtData(t)}.<br>⏱️ El mercat es tancarà en <b id="mkCount"></b>`; tickMarket(); }
   else { el.className='market-banner'; el.innerHTML='🟢 <b>Mercat obert.</b>'; }
 }
-async function saveMarket(closesAt,manual,msg){ if(await adminRpc('admin_set_market',{p_closes_at:closesAt,p_manual_closed:manual})){ setAdminMessage('✅ '+msg); await loadMarket(); } }
+async function saveMarket(closesAt,manual,msg){ if(await adminRpc('admin_set_market',{p_closes_at:closesAt,p_manual_closed:manual})){ setAdminMessage('✅ '+msg); await loadMarket(); if(!state.market) alert('⚠️ S’ha desat, però no es pot llegir l’estat del mercat. Falta el permís de lectura a la taula market_settings (executa el SQL d’arreglament).'); else alert('✅ '+msg+(marketClosed()?' El mercat està tancat.':(state.market.closes_at?' El mercat es tancarà el '+fmtData(new Date(state.market.closes_at))+'.':''))); } }
 if($('marketSave')){
   $('marketSave').onclick=()=>{ const v=$('marketCloseAt').value; saveMarket(v?new Date(v).toISOString():null,false,'Tancament desat.'); };
   $('marketCloseNow').onclick=()=>{ if(confirm('Tancar el mercat ara mateix?')) saveMarket(state.market?.closes_at||null,true,'Mercat tancat.'); };
