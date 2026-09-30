@@ -35,7 +35,7 @@ function playerCard(p, inTeam = false) {
   const initials = fullName.split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
   
   const val = p.current_value || p.value || 0;
-  const teamLabel = p.real_team_id ? `Equip ${p.real_team_id}` : (p.team || 'Sense equip');
+  const teamLabel = p.real_team_id ? `Equip ${p.real_team_id}` : 'Sense equip';
   const catLabel = p.category || p.position || 'General';
 
   return `
@@ -51,22 +51,21 @@ function playerCard(p, inTeam = false) {
       </div>
       <div class="card-actions">
         ${inTeam ? `
-          <button type="button" class="secondary" data-sell="${pId}" onclick="sell('${pId}')">Vendre</button>
-          ${String(captain) === pId ? '' : `<button type="button" class="secondary" data-captain="${pId}" onclick="setCaptain('${pId}')">Fer capità</button>`}
+          <button type="button" class="secondary" onclick="sell('${pId}')">Vendre</button>
         ` : `
-          <button type="button" class="primary" data-buy="${pId}" onclick="buy('${pId}')">Fitxar · ${money(val)}</button>
+          <!-- ONCLICK DIRECTE: Es manté actiu en crear botons filtrats -->
+          <button type="button" class="primary" onclick="buy('${pId}')">Fitxar · ${money(val)}</button>
         `}
       </div>
     </article>
   `;
 }
-
 // 4. OPERACIONS (FITXAR I VENDRE)
 function buy(id) {
+  // Convertim ambdós IDs a String per equiparar bigint de Supabase (ex: 21) amb el text del botó ("21")
   const p = players.find(x => String(x.id) === String(id));
 
   if (!p) {
-    console.error("Jugador no trobat amb ID:", id, "a la llista:", players);
     return alert("No s'ha trobat la informació d'aquest jugador.");
   }
 
@@ -83,13 +82,29 @@ function buy(id) {
   if (pTeam) {
     const sameTeamCount = roster.filter(rId => {
       const rPlayer = players.find(player => String(player.id) === String(rId));
-      return rPlayer && rPlayer.real_team_id === pTeam;
+      return rPlayer && String(rPlayer.real_team_id) === String(pTeam);
     }).length;
 
     if (sameTeamCount >= 2) {
       return alert('No pots tenir més de 2 jugadors del mateix equip.');
     }
   }
+
+  const price = p.current_value || p.value || 0;
+  if (budget < price) {
+    return alert('No tens prou pressupost.');
+  }
+
+  roster.push(p.id);
+  budget -= price;
+  save();
+  render();
+  showSection('team');
+}
+
+// OBLIGATORI: Permet que els botons filtrats trobin la funció en fer clic
+window.buy = buy;
+window.sell = sell;
 
   const price = p.current_value || p.value || 0;
   if (budget < price) {
