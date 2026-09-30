@@ -279,7 +279,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -322,7 +322,7 @@ async function createNextRound(){
   const next=(state.round?.round_number||0)+1;
   try{
     const r=await rpc('admin_create_round',{p_pin:'1234',p_round_number:next}); const text=await r.text(); if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
-    await loadData(); await loadAdminData(); setAdminMessage(`Jornada ${next} creada/activada.`);
+    await rpc('admin_set_market',{p_closes_at:nextFriday().toISOString(),p_manual_closed:false}); await loadData(); await loadAdminData(); setAdminMessage(`Jornada ${next} creada/activada. Mercat obert fins al proper divendres a les 23:59.`);
   }catch(e){setAdminMessage(`Error: ${e.message}`);}
 }
 async function rollbackLastRound(){
@@ -434,5 +434,41 @@ if($('adminManage')){
   $('adminManage').addEventListener('change',e=>{const i=e.target.closest('[data-mgphoto]'); if(i&&i.files[0]) uploadPhoto(i.dataset.mgphoto,Number(i.closest('.mg-row').dataset.id),i.files[0]);});
   $('manageSearch').addEventListener('input',renderManage);
 }
+
+/* ===== MERCAT: tancament setmanal ===== */
+function nextFriday(){ const d=new Date(); d.setHours(23,59,0,0); d.setDate(d.getDate()+((5-d.getDay()+7)%7)); if(d<=new Date()) d.setDate(d.getDate()+7); return d; }
+function marketClosed(){ const m=state.market; return !!m&&!!(m.manual_closed||(m.closes_at&&new Date(m.closes_at)<=new Date())); }
+const fmtData=t=>t.toLocaleString('ca-ES',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
+async function loadMarket(){
+  const r=await api('market_settings?id=eq.1&select=*'); state.market=r.ok?((await r.json())[0]||null):null;
+  const m=state.market, st=$('adminMarketStatus');
+  if(st) st.textContent=marketClosed()?'Estat: 🔒 tancat':`Estat: 🟢 obert${m?.closes_at?' fins '+fmtData(new Date(m.closes_at)):''}`;
+  const inp=$('marketCloseAt'); if(inp) inp.value=m?.closes_at?new Date(new Date(m.closes_at)-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16):'';
+  renderMarketBanner();
+}
+function tickMarket(){
+  const s=$('mkCount'), m=state.market; if(!s||!m||!m.closes_at) return;
+  const ms=new Date(m.closes_at)-new Date();
+  if(ms<=0){ renderMarketBanner(); return; }
+  if(ms<864e5) $('marketBanner').classList.add('soon');
+  const t=Math.floor(ms/1000), d=Math.floor(t/86400), h=Math.floor(t%86400/3600), mi=Math.floor(t%3600/60), se=t%60;
+  const p=(n,u,pl)=>`${n} ${n===1?u:pl}`;
+  s.textContent=`${p(d,'dia','dies')}, ${p(h,'hora','hores')}, ${p(mi,'minut','minuts')} i ${p(se,'segon','segons')}`;
+}
+function renderMarketBanner(){
+  const el=$('marketBanner'); if(!el) return;
+  const m=state.market, closed=marketClosed();
+  document.body.classList.toggle('market-closed',closed);
+  if(closed){ el.className='market-banner closed'; el.innerHTML='🔒 <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada divendres a les 23:59 perquè ningú faci moviments un cop coneguts els resultats reals.'; }
+  else if(m&&m.closes_at){ const t=new Date(m.closes_at), h=(t-new Date())/36e5; el.className='market-banner'+(h<24?' soon':''); el.innerHTML=`${h<24?'⏳':'🟢'} <b>Mercat obert</b> fins al ${fmtData(t)}.<br>⏱️ El mercat es tancarà en <b id="mkCount"></b>`; tickMarket(); }
+  else { el.className='market-banner'; el.innerHTML='🟢 <b>Mercat obert.</b>'; }
+}
+async function saveMarket(closesAt,manual,msg){ if(await adminRpc('admin_set_market',{p_closes_at:closesAt,p_manual_closed:manual})){ setAdminMessage('✅ '+msg); await loadMarket(); } }
+if($('marketSave')){
+  $('marketSave').onclick=()=>{ const v=$('marketCloseAt').value; saveMarket(v?new Date(v).toISOString():null,false,'Tancament desat.'); };
+  $('marketCloseNow').onclick=()=>{ if(confirm('Tancar el mercat ara mateix?')) saveMarket(state.market?.closes_at||null,true,'Mercat tancat.'); };
+  $('marketOpenNow').onclick=()=>{ if(confirm('Obrir el mercat fins al proper divendres a les 23:59?')) saveMarket(nextFriday().toISOString(),false,'Mercat obert.'); };
+}
+setInterval(tickMarket,1000);
 
 init();
