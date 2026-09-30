@@ -107,7 +107,7 @@ function coachCard(c,realTeamId,inTeam=false){
   const market=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
   const coachValue=Number(market?.current_value ?? c.current_value ?? 0);
   if(!relation)return '';
-  const coachPhoto=c.photo_url||`entrenador-${c.id}.jpeg`;
+  const coachPhoto=`entrenador-${c.id}.jpeg`;
   const owned=state.rosterCoaches.some(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(realTeamId));
   return `<article class="player-card"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" data-ph="🧑‍🏫" onerror="fixImageError(this)"></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
 }
@@ -339,7 +339,9 @@ async function rollbackLastRound(){
 }
 
 async function resetRounds(){
-  if(!confirm('Això eliminarà resultats, històrics i transferències de prova, buidarà les plantilles i tornarà els equips a 120 M€. Continuar?'))return;
+  if(!confirm(`⚠️ ATENCIÓ: RESET TOTAL. Aquesta acció NO es pot desfer.\n\nS’ESBORRARAN:\n• tots els resultats, punts i històrics de jornades\n• les plantilles i els fitxatges de TOTS els usuaris\n\nEs RESTAURARAN:\n• el pressupost de tots els equips a 120 M€\n• el valor de tots els jugadors a 10 M€ i dels entrenadors a 12 M€\n• la Jornada 1 tornarà a ser l’activa\n\nVols continuar?`))return;
+  const paraula=prompt('Per confirmar el reset total, escriu RESET (en majúscules):');
+  if(paraula!=='RESET'){setAdminMessage('Reset cancel·lat. No s’ha canviat res.');return;}
   try{
     const r=await rpc('admin_reset_rounds',{p_pin:'1234'}); const text=await r.text(); if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
     await loadData(); await loadAdminData(); setAdminMessage('Reset completat. Jornada 1 activa i dades de prova netes.');
