@@ -26,7 +26,7 @@ function coachName(c){return `${c.name||''} ${c.surname||''}`.trim();}
 function fixImageError(img){const ph=document.createElement('div');ph.className='photo-placeholder';ph.textContent=img.dataset.ph||'📷';img.replaceWith(ph);}
 function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
 function setAuthMessage(msg, ok=false){ $('authMessage').textContent=msg||''; $('authMessage').className=ok?'auth-message ok':'auth-message'; }
-function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; }
+function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; const b=$('adminMessageBottom'); if(b) b.textContent=msg||''; }
 
 async function authRequest(path, body){
   const r=await fetch(`${SUPABASE_URL}/auth/v1/${path}`,{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -107,7 +107,7 @@ function coachCard(c,realTeamId,inTeam=false){
   const market=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
   const coachValue=Number(market?.current_value ?? c.current_value ?? 0);
   if(!relation)return '';
-  const coachPhoto=`entrenador-${c.id}.jpeg`;
+  const coachPhoto=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
   const owned=state.rosterCoaches.some(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(realTeamId));
   return `<article class="player-card"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" data-ph="🧑‍🏫" onerror="fixImageError(this)"></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
 }
@@ -286,7 +286,7 @@ async function loadData(){
 async function adminReset(){
   if($('adminPinInput').value!=='1234') return setAdminMessage('PIN incorrecte.');
   state.admin=true; $('adminPinCard').style.display='none'; $('adminPanel').style.display='block'; setAdminMessage('Administrador actiu.');
-  await loadAdminData();
+  await loadAdminData(); loadManage();
 }
 async function loadAdminData(){
   if(!state.admin)return;
@@ -344,8 +344,8 @@ async function resetRounds(){
   if(paraula!=='RESET'){setAdminMessage('Reset cancel·lat. No s’ha canviat res.');return;}
   try{
     const r=await rpc('admin_reset_rounds',{p_pin:'1234'}); const text=await r.text(); if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
-    await loadData(); await loadAdminData(); setAdminMessage('Reset completat. Jornada 1 activa i dades de prova netes.');
-  }catch(e){setAdminMessage(`No s’ha pogut fer el reset: ${e.message}`);}
+    await loadData(); await loadAdminData(); setAdminMessage('Reset completat. Jornada 1 activa i dades de prova netes.'); alert('✅ Reset completat. Jornada 1 activa, pressupostos a 120 M€ i valors restaurats.');
+  }catch(e){setAdminMessage(`No s’ha pogut fer el reset: ${e.message}`); alert(`⚠️ No s’ha pogut fer el reset: ${e.message}`);}
 }
 function openAdmin(){showSection('admin');$('adminPinCard').style.display=state.admin?'none':'block';$('adminPanel').style.display=state.admin?'block':'none';}
 
@@ -360,4 +360,79 @@ function init(){
   if(saved){try{state.session=JSON.parse(saved);state.username=state.session?.user?.user_metadata?.username||state.session?.user?.email?.split('@')[0]||'';refreshSession().then(ok=>ok?ensureFantasyTeam():showAuth());}catch{showAuth();}} else showAuth();
   setInterval(()=>{if(state.session)refreshSession();},45*60*1000);
 }
+
+/* ===== GESTIÓ D'ADMINISTRADOR: jugadors, entrenadors, usuaris, fotos i registre ===== */
+async function adminRpc(name, body){
+  const r=await rpc(name, body);
+  if(!r.ok){ const t=await r.text(); let m=t; try{m=JSON.parse(t).message||t;}catch{} alert('⚠️ '+m); return false; }
+  return true;
+}
+async function loadManage(){
+  if(!state.admin) return;
+  const [u,l]=await Promise.all([rpc('admin_list_users',{}), api('admin_log?select=*&order=id.desc&limit=30')]);
+  state.adminUsers=u.ok?((await u.json())||[]):[]; state.adminLog=l.ok?await l.json():[];
+  renderManage();
+}
+function coachPrice(c){ return (state.coachMarkets.find(m=>String(m.coach_id)===String(c.id))||{}).current_value??''; }
+function renderManage(){
+  const box=$('adminManage'); if(!box||!state.admin) return;
+  const q=($('manageSearch').value||'').toLowerCase().trim();
+  const hit=x=>!q||coachName(x).toLowerCase().includes(q);
+  const byName=(a,b)=>coachName(a).localeCompare(coachName(b));
+  const teamOpts=sel=>state.teams.map(t=>`<option value="${t.id}"${String(t.id)===String(sel)?' selected':''}>${escapeHtml(t.name)}</option>`).join('');
+  const coachOpts=sel=>'<option value="">— Cap —</option>'+state.coaches.slice().sort(byName).map(c=>`<option value="${c.id}"${String(c.id)===String(sel)?' selected':''}>${escapeHtml(coachName(c))}</option>`).join('');
+  const photo=k=>`<label class="secondary mg-ph" title="Pujar foto">📷<input type="file" accept="image/*" hidden data-mgphoto="${k}"></label>`;
+  const who=id=>{const u=(state.adminUsers||[]).find(x=>x.user_id===id);return u?(u.username||u.email):'—';};
+  const pl=state.players.filter(hit).sort(byName), cs=state.coaches.filter(hit).sort(byName);
+  box.innerHTML=`
+  <h4>🏀 Jugadors (${pl.length})</h4>
+  <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-d" placeholder="Dorsal" inputmode="numeric"><input class="mg-v" placeholder="Valor M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addp">Afegir jugador</button></div>
+  ${pl.slice(0,40).map(p=>`<div class="mg-row" data-id="${p.id}"><input class="mg-n" value="${escapeHtml(p.name||'')}"><input class="mg-s" value="${escapeHtml(p.surname||'')}"><input class="mg-d" value="${escapeHtml(p.shirt_number??'')}" inputmode="numeric"><input class="mg-v" value="${escapeHtml(p.current_value??'')}" inputmode="decimal"><select class="mg-t">${teamOpts(p.real_team_id)}</select>${photo('players')}<button class="primary" data-mg="savep">Desar</button><button class="secondary danger" data-mg="delp">Retirar</button></div>`).join('')}
+  ${pl.length>40?'<small>Mostrant 40. Usa el cercador per afinar.</small>':''}
+  <h4>🧑‍🏫 Entrenadors (${cs.length})</h4>
+  <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
+  ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>`).join('')}
+  <h4>👤 Usuaris, entrenadors i administradors</h4>
+  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
+  <h4>📜 Registre d’activitat (últims 30)</h4>
+  ${(state.adminLog||[]).map(x=>{const d=x.detall||{};const what=[d.name,d.surname].filter(Boolean).join(' ')||d.user_id||d.id||'';return `<div class="mg-log"><small>${new Date(x.created_at).toLocaleString('ca-ES')} · <b>${escapeHtml(who(x.user_id))}</b> · ${escapeHtml(x.tabla)} ${escapeHtml(x.operacio)} · ${escapeHtml(String(what))}</small></div>`;}).join('')||'<small>Encara no hi ha activitat.</small>'}`;
+}
+async function compressImage(file,max=600){
+  const img=await createImageBitmap(file), k=Math.min(1,max/Math.max(img.width,img.height));
+  const c=document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return new Promise(res=>c.toBlob(res,'image/jpeg',0.82));
+}
+async function uploadPhoto(kind,id,file){
+  try{
+    const blob=await compressImage(file), path=`${kind}/${id}-${Date.now()}.jpg`;
+    const r=await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`,{method:'POST',headers:{...headers(),'Content-Type':'image/jpeg'},body:blob});
+    if(!r.ok) return alert('⚠️ No s’ha pogut pujar la foto: '+await r.text());
+    const url=`${SUPABASE_URL}/storage/v1/object/public/fotos/${path}`;
+    if(await adminRpc('admin_set_photo',{p_kind:kind,p_id:id,p_url:url})){ setAdminMessage('✅ Foto pujada.'); await loadData(); await loadManage(); }
+  }catch(e){ alert('⚠️ '+e.message); }
+}
+async function manageClick(e){
+  const b=e.target.closest('[data-mg]'); if(!b) return;
+  const row=b.closest('.mg-row'), a=b.dataset.mg;
+  const v=s=>(row.querySelector(s)?.value||'').trim();
+  const num=s=>v(s)===''?null:Number(v(s).replace(',','.'));
+  const nom=()=>`${v('.mg-n')} ${v('.mg-s')}`.trim();
+  let ok=false, msg='';
+  if(a==='savep'){ ok=await adminRpc('admin_save_player',{p_id:Number(row.dataset.id),p_data:{name:v('.mg-n'),surname:v('.mg-s'),shirt_number:num('.mg-d'),current_value:num('.mg-v'),real_team_id:Number(v('.mg-t'))}}); msg='Jugador desat.'; }
+  else if(a==='addp'){ if(!v('.mg-n')) return alert('Cal escriure un nom.'); ok=await adminRpc('admin_save_player',{p_id:null,p_data:{name:v('.mg-n'),surname:v('.mg-s'),shirt_number:num('.mg-d'),current_value:num('.mg-v'),real_team_id:Number(v('.mg-t'))}}); msg='Jugador afegit.'; }
+  else if(a==='delp'){ if(!confirm(`Retirar ${nom()}?\n\nDeixarà de sortir al mercat. Si algú el té fitxat, se li reemborsarà el valor actual (${v('.mg-v')||'?'} M€).`)) return; ok=await adminRpc('admin_retire_player',{p_id:Number(row.dataset.id)}); msg='Jugador retirat.'; }
+  else if(a==='savec'){ ok=await adminRpc('admin_save_coach',{p_id:Number(row.dataset.id),p_data:{name:v('.mg-n'),surname:v('.mg-s'),current_value:num('.mg-v')}}); msg='Entrenador desat.'; }
+  else if(a==='addc'){ if(!v('.mg-n')) return alert('Cal escriure un nom.'); ok=await adminRpc('admin_save_coach',{p_id:null,p_data:{name:v('.mg-n'),surname:v('.mg-s'),current_value:num('.mg-v')},p_team_id:Number(v('.mg-t'))}); msg='Entrenador afegit.'; }
+  else if(a==='delc'){ if(!confirm(`Retirar l’entrenador ${nom()}?\n\nSi algú el té fitxat, se li reemborsarà el seu valor de mercat.`)) return; ok=await adminRpc('admin_retire_coach',{p_id:Number(row.dataset.id)}); msg='Entrenador retirat.'; }
+  else if(a==='role'){ ok=await adminRpc('admin_set_coach_assignment',{p_pin:'1234',p_user_id:row.dataset.uid,p_coach_id:v('.mg-c')?Number(v('.mg-c')):null}); msg='Rol d’entrenador actualitzat.'; }
+  else if(a==='adm'){ const fer=row.dataset.adm!=='1'; if(!confirm(fer?'Donar permisos d’administrador a aquest usuari?':'Treure els permisos d’administrador a aquest usuari?')) return; ok=await adminRpc('admin_set_admin',{p_user_id:row.dataset.uid,p_admin:fer}); msg='Permisos actualitzats.'; }
+  if(ok){ setAdminMessage('✅ '+msg); await loadData(); await loadManage(); }
+}
+if($('adminManage')){
+  $('adminManage').addEventListener('click',manageClick);
+  $('adminManage').addEventListener('change',e=>{const i=e.target.closest('[data-mgphoto]'); if(i&&i.files[0]) uploadPhoto(i.dataset.mgphoto,Number(i.closest('.mg-row').dataset.id),i.files[0]);});
+  $('manageSearch').addEventListener('input',renderManage);
+}
+
 init();
