@@ -145,6 +145,7 @@ function renderMarket(){
     state.coachTeams.forEach(r=>{const c=state.coaches.find(c=>String(c.id)===String(r.coach_id));if(c&&(!team||String(r.real_team_id)===String(team))&&`${coachName(c)} ${teamName(r.real_team_id)}`.toLowerCase().includes(q))list.push(coachCard(c,r.real_team_id,false));});
     $('marketGrid').innerHTML=list.join('')||'<div class="empty-state"><div class="empty-icon">🔎</div><h3>No hem trobat cap entrenador</h3></div>';
   }
+   bindActions();   // <-- afegeix aquesta línia
 }
 function renderClubs(){
   $('clubsGrid').innerHTML=state.teams.map(t=>{const count=state.players.filter(p=>String(p.real_team_id)===String(t.id)).length;const names=state.coachTeams.filter(r=>String(r.real_team_id)===String(t.id)).map(r=>state.coaches.find(c=>String(c.id)===String(r.coach_id))).filter(Boolean).map(coachName);return `<article class="club-card"><div class="club-short">${escapeHtml(t.short_name||'')}</div><h3>${escapeHtml(t.name)}</h3><div class="club-players">🏀 ${count} jugadors</div><div class="club-coaches"><strong>Entrenadors</strong>${names.map(n=>`<span>👤 ${escapeHtml(n)}</span>`).join('')||'<span>Sense entrenadors</span>'}</div></article>`;}).join('');
