@@ -23,6 +23,7 @@ function rpc(name, body){ return api(`rpc/${name}`, {method:'POST', body:JSON.st
 function escapeHtml(v){return String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function teamName(id){return state.teams.find(t=>String(t.id)===String(id))?.name || 'Equip desconegut';}
 function coachName(c){return `${c.name||''} ${c.surname||''}`.trim();}
+function fixImageError(img){const ph=document.createElement('div');ph.className='photo-placeholder';ph.textContent='📷';img.replaceWith(ph);}
 function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
 function setAuthMessage(msg, ok=false){ $('authMessage').textContent=msg||''; $('authMessage').className=ok?'auth-message ok':'auth-message'; }
 function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; }
@@ -32,6 +33,11 @@ async function authRequest(path, body){
   const data=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(data.error_description || data.msg || data.message || 'No s’ha pogut completar l’operació.');
   return data;
+}
+
+async function refreshSession(){
+  const rt=state.session?.refresh_token; if(!rt) return false;
+  try{ const data=await authRequest('token?grant_type=refresh_token',{refresh_token:rt}); state.session=data; localStorage.setItem('fantasySession',JSON.stringify(data)); return true; }catch{ return false; }
 }
 
 async function signup(){
@@ -90,7 +96,7 @@ function hideAuth(){ $('authGate').style.display='none'; $('appShell').style.dis
 
 function playerCard(p,inTeam=false){
   const dorsal=p.shirt_number ?? '—';
-  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo">` : '<div class="photo-placeholder">📷</div>';
+  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" onerror="fixImageError(this)">` : '<div class="photo-placeholder">📷</div>';
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
@@ -162,7 +168,7 @@ function renderCoachPanel(){
     section.style.display='none';
     return;
   }
-  section.style.display='block';
+  section.style.display='';
   $('coachPanelSubtitle').textContent=`Hola ${state.coachContext[0].coach_name}. Selecciona el jugador destacat de cada equip després que s’hagi registrat el resultat.`;
   $('coachPanelGrid').innerHTML=state.coachContext.map(ctx=>{
     const players=state.players.filter(p=>String(p.real_team_id)===String(ctx.real_team_id));
@@ -171,7 +177,7 @@ function renderCoachPanel(){
       <div class="coach-team-header"><div><span class="coach-label">EQUIP</span><h3>${escapeHtml(ctx.real_team_name)}</h3><p>${ctx.result==='win'?'🟢 Victòria':ctx.result==='loss'?'🔴 Derrota':'⏳ Resultat pendent'} · Jornada ${ctx.round_number}</p></div><div class="pill">${selected?'⭐ Destacat seleccionat':'Sense destacat'}</div></div>
       ${ctx.result ? `<div class="coach-player-list">${players.map(p=>{
         const isSelected=String(p.id)===String(selected);
-        return `<button class="coach-player-option${isSelected?' selected':''}" data-highlight-player="${p.id}" data-highlight-team="${ctx.real_team_id}"><span class="coach-player-main"><b>#${escapeHtml(String(p.shirt_number ?? '—').replace(/\\.0$/,''))}</b><span>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</span></span><span>${isSelected?'⭐ Destacat':'Seleccionar'}</span></button>`;
+        return `<button class="coach-player-option${isSelected?' selected':''}" data-highlight-player="${p.id}" data-highlight-team="${ctx.real_team_id}"><span class="coach-player-main"><b>#${escapeHtml(String(p.shirt_number ?? '—').replace(/\.0$/,''))}</b><span>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</span></span><span>${isSelected?'⭐ Destacat':'Seleccionar'}</span></button>`;
       }).join('')}</div>` : `<div class="notice">Quan l’administrador registri el resultat, podràs seleccionar el jugador destacat.</div>`}
     </article>`;
   }).join('');
@@ -347,6 +353,7 @@ function init(){
   $('adminUnlock').onclick=adminReset; $('adminSaveResults').onclick=saveAdminResults; $('adminProcessRound').onclick=processCurrentRound; $('adminNewRound').onclick=createNextRound; $('adminRollbackRound').onclick=rollbackLastRound; $('adminResetRounds').onclick=resetRounds;
   let clicks=0, timer=null; $('logoSecret').addEventListener('click',()=>{clicks++;clearTimeout(timer);timer=setTimeout(()=>clicks=0,1200);if(clicks>=5){clicks=0;openAdmin();}});
   const saved=localStorage.getItem('fantasySession');
-  if(saved){try{state.session=JSON.parse(saved);state.username=state.session?.user?.user_metadata?.username||state.session?.user?.email?.split('@')[0]||'';ensureFantasyTeam();}catch{showAuth();}} else showAuth();
+  if(saved){try{state.session=JSON.parse(saved);state.username=state.session?.user?.user_metadata?.username||state.session?.user?.email?.split('@')[0]||'';refreshSession().then(ok=>ok?ensureFantasyTeam():showAuth());}catch{showAuth();}} else showAuth();
+  setInterval(()=>{if(state.session)refreshSession();},45*60*1000);
 }
 init();
