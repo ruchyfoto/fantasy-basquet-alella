@@ -100,7 +100,7 @@ function playerCard(p,inTeam=false){
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
-  return `<article class="player-card${isCaptain?' captain-card':''}"><div class="player-visual">${photo}${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
 }
 function coachCard(c,realTeamId,inTeam=false){
   const relation=state.coachTeams.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -131,7 +131,7 @@ const COURT_SVG='<svg class="court-svg" viewBox="0 0 300 400" preserveAspectRati
 const SLOTS=[[18,19],[50,15],[82,19],[18,45],[50,43],[82,45],[34,75],[66,75]];
 function courtCard(p,isCap){
   const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" data-ph="👤" onerror="fixImageError(this)">`:'<div class="photo-placeholder">👤</div>';
-  return `<div class="pcard${isCap?' cap':''}">${isCap?'<span class="cap-badge">C</span>':''}${ph}<b>${escapeHtml(p.name)}</b><small>#${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))} · ${money(p.current_value)}</small><div class="acts"><button class="secondary" data-captain-player="${p.id}" title="Fer capità">${isCap?'⭐':'☆'}</button><button class="secondary" data-sell-player="${p.id}" title="Vendre">💸</button></div></div>`;
+  return `<div class="pcard${isCap?' cap':''}" data-pid="${p.id}">${isCap?'<span class="cap-badge">C</span>':''}${ph}<b>${escapeHtml(p.name)}</b><small>#${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))} · ${money(p.current_value)}</small><div class="acts"><button class="secondary" data-captain-player="${p.id}" title="Fer capità">${isCap?'⭐':'☆'}</button><button class="secondary" data-sell-player="${p.id}" title="Vendre">💸</button></div></div>`;
 }
 function benchCard(c,realTeamId){
   const m=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -488,6 +488,42 @@ if($('marketSave')){
   $('marketOpenNow').onclick=()=>{ if(confirm('Obrir el mercat fins al proper divendres a les 23:59?')) saveMarket(nextFriday().toISOString(),false,'Mercat obert.'); };
 }
 setInterval(tickMarket,1000);
+
+/* ===== ESTADÍSTIQUES DE JUGADOR ===== */
+const f1=v=>Number(v||0).toFixed(1).replace('.',',');
+function svgLine(vals,labs){
+  const W=320,H=150,p=28,n=vals.length,mn=Math.min(...vals),mx=Math.max(...vals),r=(mx-mn)||1,st=Math.ceil(n/7);
+  const x=i=>n>1?p+i*(W-2*p)/(n-1):W/2, y=v=>H-p-((v-mn)/r)*(H-2*p-8);
+  const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" class="st-svg"><polygon points="${x(0)},${H-p} ${pts} ${x(n-1)},${H-p}" fill="rgba(232,118,44,.14)"/><polyline class="draw" pathLength="1" points="${pts}" fill="none" stroke="#e8762c" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="#e8762c"/>${i%st===0||i===n-1?`<text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="9" font-weight="700" fill="#24332c">${f1(v)}</text><text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="9" fill="#5d6d65">${labs[i]}</text>`:''}`).join('')}</svg>`;
+}
+function svgBars(rows,labs){
+  const W=320,H=150,p=28,n=rows.length,mx=Math.max(1,...rows.map(r=>Number(r.total_points||0))),cw=(W-2*p)/n,bw=Math.min(30,cw-6),y=v=>H-p-(v/mx)*(H-2*p-10);
+  return `<svg viewBox="0 0 ${W} ${H}" class="st-svg"><line x1="${p}" x2="${W-p}" y1="${H-p}" y2="${H-p}" stroke="#ccd5cf"/>${rows.map((r,i)=>{const w=Number(r.win_points||0),h=Number(r.highlight_points||0),cx=p+cw*(i+.5),x=cx-bw/2;return `<rect x="${x}" y="${y(w)}" width="${bw}" height="${H-p-y(w)}" rx="3" fill="#0f6b46"/><rect x="${x}" y="${y(w+h)}" width="${bw}" height="${y(w)-y(w+h)}" rx="3" fill="#e8762c"/><text x="${cx}" y="${y(w+h)-4}" text-anchor="middle" font-size="9" font-weight="700" fill="#24332c">${f1(w+h)}</text><text x="${cx}" y="${H-8}" text-anchor="middle" font-size="9" fill="#5d6d65">${labs[i]}</text>`;}).join('')}</svg>`;
+}
+function closeStats(){ const m=$('statsModal'); if(m) m.classList.remove('open'); document.body.style.overflow=''; }
+async function openStats(id){
+  const p=state.players.find(x=>Number(x.id)===id); if(!p) return;
+  let m=$('statsModal');
+  if(!m){ m=document.createElement('div'); m.id='statsModal'; m.className='st-modal'; document.body.appendChild(m);
+    m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('.st-close')) closeStats(); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeStats(); }); }
+  const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="" data-ph="👤" onerror="fixImageError(this)">`:'<div class="photo-placeholder">👤</div>';
+  const head=`<button class="st-close" aria-label="Tancar">✕</button><div class="st-head">${ph}<div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><small>🏀 ${escapeHtml(teamName(p.real_team_id))} · #${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))}</small></div></div>`;
+  m.innerHTML=`<div class="st-card">${head}<p>Carregant estadístiques…</p></div>`; m.classList.add('open'); document.body.style.overflow='hidden';
+  const [hr,rr,pr]=await Promise.all([api(`player_round_history?player_id=eq.${id}&order=round_id.asc&select=*`),api('fantasy_rounds?select=id,round_number'),rpc('get_player_popularity',{p_player_id:id})]);
+  const rows=hr.ok?await hr.json():[]; const rn={}; (rr.ok?await rr.json():[]).forEach(x=>rn[x.id]=x.round_number);
+  const pop=pr.ok?await pr.json().catch(()=>null):null; const lab=r=>'J'+(rn[r.round_id]??'?');
+  const cur=Number(p.current_value||0), ini=rows.length?Number(rows[0].value_after)-Number(rows[0].value_change):cur, delta=cur-ini;
+  const pts=rows.reduce((s,r)=>s+Number(r.total_points||0),0), wins=rows.filter(r=>r.result==='win').length, hl=rows.filter(r=>r.is_highlighted).length, streak=rows.length?Number(rows[rows.length-1].win_streak||0):0;
+  const tile=(k,v,c='')=>`<div><small>${k}</small><b class="${c}">${v}</b></div>`;
+  const pct=pop&&Number(pop.teams)?Math.round(100*Number(pop.owners)/Number(pop.teams)):null;
+  const body=`<div class="st-kpis">${tile('Punts totals',f1(pts))}${tile('Jornades',rows.length)}${tile('Victòries',`${wins}/${rows.length}`)}${tile('Destacat',`${hl} ${hl===1?'cop':'cops'}`)}${tile('Ratxa',streak)}${tile('Valor',money(cur))}</div>`
+   +(rows.length?`<h4>Evolució del valor <span class="${delta>=0?'st-up':'st-down'}">${delta>=0?'▲ +':'▼ '}${f1(delta)} M€</span></h4>${svgLine([ini,...rows.map(r=>Number(r.value_after))],['Inici',...rows.map(lab)])}<h4>Punts per jornada</h4>${svgBars(rows.slice(-12),rows.slice(-12).map(lab))}<div class="st-legend"><i style="background:#0f6b46"></i>Victòria<i style="background:#e8762c"></i>Destacat</div>`:'<p class="st-empty">Encara no hi ha jornades processades. Les gràfiques apareixeran quan es processi la primera jornada.</p>')
+   +(pct!==null?`<h4>Popularitat</h4><div class="st-bar"><i style="width:${pct}%"></i></div><small>${pop.owners} de ${pop.teams} equips el tenen (${pct}%)</small>`:'');
+  m.innerHTML=`<div class="st-card">${head}${body}</div>`;
+}
+document.addEventListener('click',e=>{ if(e.target.closest('button,a,input,select,label,#statsModal')) return; const c=e.target.closest('[data-pid]'); if(c) openStats(Number(c.dataset.pid)); });
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
