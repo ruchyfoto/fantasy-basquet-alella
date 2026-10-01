@@ -145,13 +145,14 @@ function benchCard(c,realTeamId){
   const photo=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
   return `<div class="bench-card" data-cid="${c.id}" data-ctid="${realTeamId}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(coachName(c))}" data-ph="🧑‍🏫" onerror="fixImageError(this)"><div><b>${escapeHtml(coachName(c))}</b><small>🏀 ${escapeHtml(teamName(realTeamId))} · ${money(m?.current_value??c.current_value)}</small><div><button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">💸 Vendre</button></div></div></div>`;
 }
+function goMarket(type){ showSection('market'); const b=document.querySelector(`.market-tab[data-market="${type}"]`); if(b) b.click(); }
 function renderTeam(){
   const order=courtOrder();
   const slots=SLOTS_P.map((s,i)=>{const p=order[i]?state.players.find(x=>String(x.id)===String(order[i])):null; const r=state.rosterPlayers.find(x=>String(x.player_id)===String(order[i]));
-    return `<div class="slot" data-i="${i}" style="left:${s.x}%;top:${s.y}%;--s:${s.s};--i:${i};z-index:${Math.round(s.y)+2}">${p?courtCard(p,r&&r.is_captain):'<div class="slot-empty" onclick="showSection(\'market\')" title="Fitxar un jugador">+</div>'}</div>`;}).join('');
+    return `<div class="slot" data-i="${i}" style="left:${s.x}%;top:${s.y}%;--s:${s.s};--i:${i};z-index:${Math.round(s.y)+2}">${p?courtCard(p,r&&r.is_captain):'<div class="slot-empty" onclick="goMarket(\'players\')" title="Fitxar un jugador">+</div>'}</div>`;}).join('');
   $('teamPlayers').innerHTML=`<div class="court-floor">${COURT_SVG}</div>`+slots;
   const cs=state.rosterCoaches.map(x=>{const c=state.coaches.find(c=>String(c.id)===String(x.coach_id));return c?benchCard(c,x.real_team_id):'';}).join('');
-  $('teamCoaches').innerHTML=cs+Array(Math.max(0,2-state.rosterCoaches.length)).fill('<div class="bench-card empty" onclick="showSection(\'market\')">➕ Fitxar entrenador</div>').join('');
+  $('teamCoaches').innerHTML=cs+Array(Math.max(0,2-state.rosterCoaches.length)).fill('<div class="bench-card empty" onclick="goMarket(\'coaches\')">➕ Fitxar entrenador</div>').join('');
   const captain=state.rosterPlayers.find(x=>x.is_captain), cp=captain?state.players.find(p=>String(p.id)===String(captain.player_id)):null;
   $('captainName').textContent=cp?`${cp.name} ${cp.surname||''}`.trim():'pendent';
   bindActions();
