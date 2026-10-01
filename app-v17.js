@@ -24,7 +24,7 @@ function escapeHtml(v){return String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;
 function teamName(id){return state.teams.find(t=>String(t.id)===String(id))?.name || 'Equip desconegut';}
 function coachName(c){return `${c.name||''} ${c.surname||''}`.trim();}
 function fixImageError(img){const ph=document.createElement('div');ph.className='photo-placeholder';ph.textContent=img.dataset.ph||'📷';img.replaceWith(ph);}
-function showSection(id){ if(id==='team') playCourt();document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
+function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
 function setAuthMessage(msg, ok=false){ $('authMessage').textContent=msg||''; $('authMessage').className=ok?'auth-message ok':'auth-message'; }
 function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; const b=$('adminMessageBottom'); if(b) b.textContent=msg||''; }
 
@@ -491,7 +491,12 @@ setInterval(tickMarket,1000);
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
-function playCourt(){ const c=$('teamPlayers'); if(!c) return; c.classList.remove('play'); void c.offsetWidth; c.classList.add('play'); setTimeout(()=>c.classList.remove('play'),1700); }
+function playCourt(){ const c=$('teamPlayers'); if(!c) return; c.classList.add('done'); c.classList.remove('play'); void c.offsetWidth; c.classList.add('play'); setTimeout(()=>c.classList.remove('play'),1700); }
+(function(){
+  const c=$('teamPlayers'); if(!c) return;
+  if(!('IntersectionObserver' in window)){ c.classList.add('done'); return; }
+  new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting) playCourt(); }),{threshold:.35}).observe(c);
+})();
 function animateMoney(el,to){
   if(!el) return; const from=el.dataset.v===undefined?to:Number(el.dataset.v); el.dataset.v=to;
   if(from===to||reduceMotion()){ el.textContent=money(to); return; }
