@@ -127,7 +127,7 @@ function render(){
   $('userLabel').textContent=state.username || state.session?.user?.email || '';
   renderTeam(); renderMarket(); renderClubs(); renderResults(); renderCoachPanel(); renderRules(); bindActions();
 }
-const COURT_SVG='<svg class="court-svg" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><rect x="8" y="8" width="284" height="384" rx="4"/><path d="M110 8 A40 40 0 0 0 190 8"/><rect x="100" y="240" width="100" height="152"/><circle cx="150" cy="240" r="36"/><path d="M30 392 V330 A120 120 0 0 1 270 330 V392"/><path d="M135 380 H165"/><circle cx="150" cy="370" r="7"/></svg>';
+const COURT_SVG='<svg class="court-svg" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><text x="150" y="150" text-anchor="middle" font-size="78" font-weight="900" fill="none" stroke="#e8762c" stroke-opacity=".35" stroke-width="1.6" style="font-family:\'Barlow Condensed\',Impact,sans-serif;font-style:italic">ALELLA</text><rect x="8" y="8" width="284" height="384" rx="4"/><path d="M110 8 A40 40 0 0 0 190 8"/><rect class="key" x="100" y="240" width="100" height="152"/><circle cx="150" cy="240" r="36"/><path class="arc" d="M30 392 V330 A120 120 0 0 1 270 330 V392"/><path d="M135 380 H165"/><circle cx="150" cy="370" r="7"/></svg>';
 const SLOTS=[[18,19],[50,15],[82,19],[18,45],[50,43],[82,45],[34,75],[66,75]];
 function courtCard(p,isCap){
   const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" data-ph="👤" onerror="fixImageError(this)">`:'<div class="photo-placeholder">👤</div>';
