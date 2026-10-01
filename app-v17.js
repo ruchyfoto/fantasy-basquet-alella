@@ -24,7 +24,7 @@ function escapeHtml(v){return String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;
 function teamName(id){return state.teams.find(t=>String(t.id)===String(id))?.name || 'Equip desconegut';}
 function coachName(c){return `${c.name||''} ${c.surname||''}`.trim();}
 function fixImageError(img){const ph=document.createElement('div');ph.className='photo-placeholder';ph.textContent=img.dataset.ph||'📷';img.replaceWith(ph);}
-function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
+function showSection(id){ if(id==='team') playCourt();document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
 function setAuthMessage(msg, ok=false){ $('authMessage').textContent=msg||''; $('authMessage').className=ok?'auth-message ok':'auth-message'; }
 function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; const b=$('adminMessageBottom'); if(b) b.textContent=msg||''; }
 
@@ -114,7 +114,7 @@ function coachCard(c,realTeamId,inTeam=false){
 
 function render(){
   const teamBudget=state.team?.budget ?? 0;
-  $('budget').textContent=money(teamBudget);
+  animateMoney($('budget'),Number(teamBudget));
   $('rosterCount').textContent=`${state.rosterPlayers.length}/8`;
   $('coachCount').textContent=`${state.rosterCoaches.length}/2`;
   $('weekLabel').textContent=state.round?`Jornada ${state.round.round_number}`:'Jornada —';
@@ -140,7 +140,7 @@ function benchCard(c,realTeamId){
 }
 function renderTeam(){
   const ps=state.rosterPlayers.map(x=>({x,p:state.players.find(p=>String(p.id)===String(x.player_id))})).filter(o=>o.p);
-  const slots=SLOTS.map(([x,y],i)=>{const o=ps[i];return `<div class="slot" style="left:${x}%;top:${y}%">${o?courtCard(o.p,o.x.is_captain):'<div class="slot-empty" onclick="showSection(\'market\')" title="Fitxar un jugador">+</div>'}</div>`;}).join('');
+  const slots=SLOTS.map(([x,y],i)=>{const o=ps[i];return `<div class="slot" style="left:${x}%;top:${y}%;--i:${i}">${o?courtCard(o.p,o.x.is_captain):'<div class="slot-empty" onclick="showSection(\'market\')" title="Fitxar un jugador">+</div>'}</div>`;}).join('');
   $('teamPlayers').innerHTML=COURT_SVG+slots;
   const cs=state.rosterCoaches.map(x=>{const c=state.coaches.find(c=>String(c.id)===String(x.coach_id));return c?benchCard(c,x.real_team_id):'';}).join('');
   $('teamCoaches').innerHTML=cs+Array(Math.max(0,2-state.rosterCoaches.length)).fill('<div class="bench-card empty" onclick="showSection(\'market\')">➕ Fitxar entrenador</div>').join('');
@@ -174,7 +174,7 @@ async function renderRanking(){
   try{
     const r=await rpc('get_fantasy_classification',{}); const txt=await r.text(); if(!r.ok)throw new Error(txt.replace(/^"|"$/g,''));
     const rows=JSON.parse(txt||'[]');
-    box.innerHTML=rows.length?rows.map((x,i)=>`<div class="ranking-row"><span class="ranking-pos">${i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b><small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`).join(''):'<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
+    box.innerHTML=rows.length?rows.map((x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b><small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`).join(''):'<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
   }catch(e){box.innerHTML=`<div class="empty-state">No s'ha pogut carregar la classificació.<br><small>${escapeHtml(e.message)}</small></div>`;}
 }
 function renderCoachPanel(){
@@ -328,7 +328,7 @@ async function processCurrentRound(){
     if(!p.ok) throw new Error((await p.text()).replace(/^"|"$/g,''));
     const c=await rpc('process_coach_round',{p_round_id:state.round.id});
     if(!c.ok) throw new Error((await c.text()).replace(/^"|"$/g,''));
-    await loadData(); await loadAdminData(); setAdminMessage('Jornada processada correctament.');
+    await loadData(); await loadAdminData(); setAdminMessage('Jornada processada correctament.'); confetti();
   }catch(e){setAdminMessage(`Error: ${e.message}`);}
 }
 
@@ -465,6 +465,7 @@ function tickMarket(){
   const ms=new Date(m.closes_at)-new Date();
   if(ms<=0){ renderMarketBanner(); return; }
   if(ms<864e5) $('marketBanner').classList.add('soon');
+  if(ms<3e5) $('marketBanner').classList.add('urgent');
   const t=Math.floor(ms/1000), d=Math.floor(t/86400), h=Math.floor(t%86400/3600), mi=Math.floor(t%3600/60), se=t%60;
   const p=(n,u,pl)=>`${n} ${n===1?u:pl}`;
   s.textContent=`${p(d,'dia','dies')}, ${p(h,'hora','hores')}, ${p(mi,'minut','minuts')} i ${p(se,'segon','segons')}`;
@@ -473,7 +474,7 @@ function renderMarketBanner(){
   const el=$('marketBanner'); if(!el) return;
   const m=state.market, closed=marketClosed();
   document.body.classList.toggle('market-closed',closed);
-  if(closed){ el.className='market-banner closed'; el.innerHTML='🔒 <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada divendres a les 23:59 perquè ningú faci moviments un cop coneguts els resultats reals.'; }
+  if(closed){ el.className='market-banner closed'; el.innerHTML='<span class="lock">🔒</span> <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada divendres a les 23:59 perquè ningú faci moviments un cop coneguts els resultats reals.'; }
   else if(m&&m.closes_at){ const t=new Date(m.closes_at), h=(t-new Date())/36e5; el.className='market-banner'+(h<24?' soon':''); el.innerHTML=`${h<24?'⏳':'🟢'} <b>Mercat obert</b> fins al ${fmtData(t)}.<br>⏱️ El mercat es tancarà en <b id="mkCount"></b>`; tickMarket(); }
   else { el.className='market-banner'; el.innerHTML='🟢 <b>Mercat obert.</b>'; }
 }
@@ -484,5 +485,22 @@ if($('marketSave')){
   $('marketOpenNow').onclick=()=>{ if(confirm('Obrir el mercat fins al proper divendres a les 23:59?')) saveMarket(nextFriday().toISOString(),false,'Mercat obert.'); };
 }
 setInterval(tickMarket,1000);
+
+/* ===== ANIMACIONS ===== */
+const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
+function playCourt(){ const c=$('teamPlayers'); if(!c) return; c.classList.remove('play'); void c.offsetWidth; c.classList.add('play'); setTimeout(()=>c.classList.remove('play'),1700); }
+function animateMoney(el,to){
+  if(!el) return; const from=el.dataset.v===undefined?to:Number(el.dataset.v); el.dataset.v=to;
+  if(from===to||reduceMotion()){ el.textContent=money(to); return; }
+  el.classList.remove('flash-up','flash-down'); void el.offsetWidth; el.classList.add(to>from?'flash-up':'flash-down');
+  const t0=performance.now();
+  (function step(t){ const k=Math.min(1,(t-t0)/700), e=1-Math.pow(1-k,3); el.textContent=money(from+(to-from)*e); if(k<1) requestAnimationFrame(step); })(t0);
+}
+function confetti(){
+  if(reduceMotion()) return;
+  const box=document.createElement('div'); box.className='confetti'; const cols=['#e8762c','#0f6b46','#ffffff','#f5c542'];
+  for(let i=0;i<70;i++){ const s=document.createElement('i'); s.style.cssText=`left:${Math.random()*100}%;background:${cols[i%4]};animation-delay:${Math.random()*.6}s;animation-duration:${2+Math.random()*1.5}s;transform:rotate(${Math.random()*360}deg)`; box.appendChild(s); }
+  document.body.appendChild(box); setTimeout(()=>box.remove(),4300);
+}
 
 init();

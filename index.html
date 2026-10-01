@@ -8,7 +8,7 @@
 <style id="club-theme">
 :root{--cg:#0f3a28;--cg2:#0a2a1d;--co:#e8762c;--cc:#d5ddd8}
 body{background:linear-gradient(160deg,#145036 0%,#0e3526 50%,#08231a 100%) fixed;color:inherit}
-body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 700' fill='none' stroke='%23fff' stroke-opacity='.07' stroke-width='3'><rect x='60' y='40' width='780' height='620' rx='8'/><rect x='330' y='40' width='240' height='260'/><circle cx='450' cy='300' r='110'/><path d='M120 40 V190 A330 330 0 0 0 780 190 V40' stroke-dasharray='14 12'/><path d='M200 560 L420 430 M420 430 l-22 4 m22 -4 l-6 21' stroke-width='4'/></svg>") center/cover no-repeat}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 700' fill='none' stroke='%23fff' stroke-opacity='.08' stroke-width='3'><style>*{stroke-dasharray:1;stroke-dashoffset:1;animation:d 4s ease-out .3s forwards}@keyframes d{to{stroke-dashoffset:0}}</style><rect pathLength='1' x='60' y='40' width='780' height='620' rx='8'/><rect pathLength='1' x='330' y='40' width='240' height='260'/><circle pathLength='1' cx='450' cy='300' r='110'/><path pathLength='1' d='M120 40 V190 A330 330 0 0 0 780 190 V40'/><path pathLength='1' d='M200 560 L420 430' stroke-width='4'/></svg>") center/cover no-repeat}
 body::after{content:'';position:fixed;left:0;top:0;bottom:0;width:8px;background:var(--co);z-index:50;pointer-events:none}
 @media(min-width:1000px){body::after{width:34px;content:'CLUB BÀSQUET ALELLA';writing-mode:vertical-rl;transform:rotate(180deg);color:#3a1b05;font:800 .78rem 'Barlow Condensed',sans-serif;letter-spacing:.25em;display:flex;align-items:center;justify-content:center}}
 .topbar{background:#08231a;border-bottom:3px solid var(--co)}
@@ -39,6 +39,28 @@ body .auth-card{border-top:5px solid var(--co);box-shadow:0 20px 50px rgba(0,0,0
 body .auth-card h1{font-family:'Barlow Condensed',Impact,sans-serif;font-style:italic;font-weight:900;text-transform:uppercase;letter-spacing:.03em;color:#0f3a28;font-size:2.2rem;line-height:1}
 body .auth-switch-btn.active{background:var(--co);color:#fff}
 body .coach-signup-note{border-left:4px solid var(--co)}
+
+@keyframes drop{0%{opacity:0;transform:translate(-50%,-190%) scale(.85)}55%{opacity:1;transform:translate(-50%,-44%) scale(1.03)}78%{transform:translate(-50%,-54%)}100%{transform:translate(-50%,-50%)}}
+.court.play .slot{animation:drop .7s cubic-bezier(.3,.9,.4,1) both;animation-delay:calc(var(--i,0)*95ms)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.35)}50%{box-shadow:0 0 0 10px rgba(255,255,255,0)}}
+.slot-empty{animation:pulse 2.2s infinite}
+@keyframes shine{0%,80%,100%{box-shadow:0 0 0 0 rgba(255,213,74,0);transform:scale(1)}90%{box-shadow:0 0 12px 4px rgba(255,213,74,.9);transform:scale(1.18)}}
+.cap-badge{animation:shine 3.5s infinite}
+@keyframes fup{0%{transform:scale(1.18);text-shadow:0 0 14px #b6ffcc}100%{transform:none;text-shadow:none}}
+@keyframes fdn{0%{transform:scale(1.18);text-shadow:0 0 14px #ffd2b0}100%{transform:none;text-shadow:none}}
+.flash-up{display:inline-block;animation:fup .9s ease}.flash-down{display:inline-block;animation:fdn .9s ease}
+@keyframes lockIn{0%{transform:translateY(-8px) rotate(-20deg)}60%{transform:rotate(10deg)}100%{transform:none}}
+.lock{display:inline-block;animation:lockIn .6s ease}
+@keyframes soon{0%,100%{box-shadow:0 0 0 0 rgba(232,118,44,.5)}50%{box-shadow:0 0 0 8px rgba(232,118,44,0)}}
+.market-banner.soon{animation:soon 2s infinite}.market-banner.urgent{background:#fde7e7;color:#8a1c1c;animation:soon 1s infinite}
+@keyframes rowIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.ranking-row{animation:rowIn .45s ease both;animation-delay:calc(var(--i,0)*70ms)}
+.ranking-row.top1{box-shadow:inset 5px 0 0 #f5c542}.ranking-row.top2{box-shadow:inset 5px 0 0 #bfc7cc}.ranking-row.top3{box-shadow:inset 5px 0 0 #cd7f32}
+.ranking-row.top1 .ranking-pos,.ranking-row.top2 .ranking-pos,.ranking-row.top3 .ranking-pos{font-size:1.5rem}
+@keyframes secIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.section.active{animation:secIn .35s ease both}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}.confetti i{position:absolute;top:-14px;width:9px;height:14px;border-radius:2px;animation:fall linear forwards}@keyframes fall{to{transform:translateY(105vh) rotate(720deg)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -81,6 +103,6 @@ body .coach-signup-note{border-left:4px solid var(--co)}
 <section id="coachPanel" class="section" style="display:none"><div class="section-head"><div><h2>🧑‍🏫 Panell d’entrenador</h2><p id="coachPanelSubtitle">Selecciona el jugador destacat de cada equip.</p></div></div><div id="coachPanelGrid" class="coach-panel-grid"></div></section>
 <section id="admin" class="section"><div class="section-head"><div><h2>Administració</h2><p>Panell de prova per gestionar jornades i resultats.</p></div></div><article id="adminPinCard" class="card admin-login"><h3>Accés administrador</h3><p>Introdueix el PIN de prova.</p><input id="adminPinInput" type="password" inputmode="numeric" maxlength="4" placeholder="PIN"><button id="adminUnlock" class="primary">Entrar</button><div id="adminMessage" class="auth-message"></div></article><article id="adminPanel" class="card" style="display:none"><div class="admin-header"><div><h3>Jornada activa: <span id="adminRoundLabel">—</span></h3><p>El panell és per a proves. El PIN actual és <b>1234</b>.</p></div><div class="card-actions"><button id="adminNewRound" class="primary">Nova jornada</button><button id="adminRollbackRound" class="secondary danger">↩️ Retrocedir última jornada</button><button id="adminResetRounds" class="secondary danger">Reset total (pressupostos, valors i jornades)</button></div></div><h3>Resultats</h3><div id="adminResults" class="admin-results"></div><div class="admin-actions"><button id="adminSaveResults" class="primary admin-save">Desar resultats</button><button id="adminProcessRound" class="secondary">Processar jornada</button></div><h3>Tancament del mercat</h3><p id="adminMarketStatus"></p><div class="mg-row"><input id="marketCloseAt" type="datetime-local"><button id="marketSave" class="primary">Desar tancament</button><button id="marketCloseNow" class="secondary danger">Tancar ara</button><button id="marketOpenNow" class="secondary">Obrir fins divendres</button></div><h3>Gestió de jugadors, entrenadors i usuaris</h3><input id="manageSearch" type="search" placeholder="Cerca jugador o entrenador…" style="width:100%;margin:8px 0"><div id="adminManage"></div><div id="adminMessageBottom" class="auth-message"></div></article></section>
 </main><footer>Fantasy Bàsquet Alella · V17 · panell d’entrenador, mercat, classificació i capità</footer></div>
-<script src="config.js?v=17"></script><script src="app-v17.js?v=30"></script>
+<script src="config.js?v=17"></script><script src="app-v17.js?v=31"></script>
 <script>document.getElementById('showLogin').onclick=()=>{document.getElementById('loginForm').style.display='block';document.getElementById('signupForm').style.display='none';document.getElementById('showLogin').classList.add('active');document.getElementById('showSignup').classList.remove('active');};document.getElementById('showSignup').onclick=()=>{document.getElementById('loginForm').style.display='none';document.getElementById('signupForm').style.display='block';document.getElementById('showSignup').classList.add('active');document.getElementById('showLogin').classList.remove('active');};</script>
 </body></html>
