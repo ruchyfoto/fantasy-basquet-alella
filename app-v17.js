@@ -100,7 +100,7 @@ function playerCard(p,inTeam=false){
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
-  return `<article class="player-card${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Punts</small><b>${f1(state.pts?.[p.id]||0)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><div class="player-pts">⭐ Punts: <b>${f1(state.pts?.[p.id]||0)}</b></div><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
 }
 function coachCard(c,realTeamId,inTeam=false){
   const relation=state.coachTeams.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -138,7 +138,7 @@ function courtOrder(){
 function saveLineup(){ try{localStorage.setItem('lineup_'+state.teamId,JSON.stringify(state.lineup));}catch{} rpc('save_lineup',{p_slots:state.lineup}).catch(()=>{}); }
 function courtCard(p,isCap){
   const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" data-ph="👤" onerror="fixImageError(this)">`:'<div class="photo-placeholder">👤</div>';
-  return `<div class="pcard${isCap?' cap':''}" data-pid="${p.id}">${isCap?'<span class="cap-badge">C</span>':''}${ph}<b>${escapeHtml(p.name)}</b><small>#${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))} · ${money(p.current_value)}</small><small class="pts">⭐ ${f1(state.pts?.[p.id]||0)} pts</small><div class="acts"><button class="secondary" data-captain-player="${p.id}" title="Fer capità">${isCap?'⭐':'☆'}</button><button class="secondary" data-sell-player="${p.id}" title="Vendre">💸</button></div></div>`;
+  return `<div class="pcard${isCap?' cap':''}" data-pid="${p.id}">${isCap?'<span class="cap-badge">C</span>':''}${ph}<b>${escapeHtml(p.name)}</b><small>#${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))} · ${money(p.current_value)}</small><small class="pts">⭐ Punts: ${f1(state.pts?.[p.id]||0)}</small><div class="acts"><button class="secondary" data-act="cap" data-id="${p.id}" title="Fer capità">${isCap?'⭐':'☆'}</button><button class="secondary" data-act="sell" data-id="${p.id}" title="Vendre">💸</button></div></div>`;
 }
 function benchCard(c,realTeamId){
   const m=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -154,6 +154,7 @@ function renderTeam(){
   $('teamCoaches').innerHTML=cs+Array(Math.max(0,2-state.rosterCoaches.length)).fill('<div class="bench-card empty" onclick="showSection(\'market\')">➕ Fitxar entrenador</div>').join('');
   const captain=state.rosterPlayers.find(x=>x.is_captain), cp=captain?state.players.find(p=>String(p.id)===String(captain.player_id)):null;
   $('captainName').textContent=cp?`${cp.name} ${cp.surname||''}`.trim():'pendent';
+  bindActions();
 }
 async function loadExtras(){
   const [pt,ts,ln]=await Promise.all([rpc('get_player_points',{}),rpc('get_team_stats',{}),api('fantasy_lineups?select=slots&limit=1')]);
@@ -217,6 +218,7 @@ async function renderRanking(){
     const rows=JSON.parse(txt||'[]');
     const isMine=x=>String(x.fantasy_team_id)===String(state.teamId), fmt=v=>Number(v||0).toFixed(1).replace('.',','), ord=n=>({1:'1r',2:'2n',3:'3r',4:'4t'}[n]||n+'è');
     const me=$('rankingMe'), idx=rows.findIndex(isMine);
+    ['myPoints','myPoints2'].forEach(k=>{ const el=$(k); if(el) el.textContent=fmt(idx>=0?rows[idx].total_points:0); });
     if(me){ if(idx<0) me.innerHTML=''; else { const pts=Number(rows[idx].total_points||0); const extra=idx>0?` · a ${fmt(Number(rows[idx-1].total_points)-pts)} pts de la posició anterior`:(rows.length>1?` · ${fmt(pts-Number(rows[1].total_points))} pts d’avantatge`:''); me.innerHTML=`<span class="me-pos">${ord(idx+1)}</span><div><b>La teva posició</b><small>${idx+1} de ${rows.length} · ${fmt(pts)} pts${extra}</small></div>`; } }
     box.innerHTML=rows.length?rows.map((x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`).join(''):'<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
   }catch(e){box.innerHTML=`<div class="empty-state">No s'ha pogut carregar la classificació.<br><small>${escapeHtml(e.message)}</small></div>`;}
@@ -570,7 +572,7 @@ async function openStats(id,kind='player',teamId=null){
    +(pct!==null?`<h4>Popularitat</h4><div class="st-bar"><i style="width:${pct}%"></i></div><small>${pop.owners} de ${pop.teams} equips el tenen (${pct}%)</small>`:'');
   m.innerHTML=`<div class="st-card">${head}${body}</div>`;
 }
-document.addEventListener('click',e=>{ if(Date.now()-(window.__dragged||0)<400) return; if(e.target.closest('button,a,input,select,label,#statsModal')) return; const c=e.target.closest('[data-pid]'); if(c) return openStats(Number(c.dataset.pid)); const k=e.target.closest('[data-cid]'); if(k) openStats(Number(k.dataset.cid),'coach',k.dataset.ctid); });
+document.addEventListener('click',e=>{ if(Date.now()-(window.__dragged||0)<400) return; const act=e.target.closest('[data-act]'); if(act){ const id=Number(act.dataset.id); return act.dataset.act==='cap'?setCaptain(id):sellPlayer(id); } if(e.target.closest('button,a,input,select,label,#statsModal')) return; const c=e.target.closest('[data-pid]'); if(c) return openStats(Number(c.dataset.pid)); const k=e.target.closest('[data-cid]'); if(k) openStats(Number(k.dataset.cid),'coach',k.dataset.ctid); });
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
