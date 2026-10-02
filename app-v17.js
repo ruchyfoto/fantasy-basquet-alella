@@ -47,6 +47,7 @@ async function signup(){
   const passwordConfirm=$('signupPasswordConfirm')?.value || '';
   if(!username||!email||!password||!passwordConfirm) return setAuthMessage('Omple tots els camps.');
   if(password.length<6) return setAuthMessage('La contrasenya ha de tenir com a mínim 6 caràcters.');
+  if(!$('acceptPrivacy')?.checked) return setAuthMessage('Cal acceptar l’avís de privacitat per crear el compte.');
   if(password!==passwordConfirm) return setAuthMessage('Les contrasenyes no coincideixen.');
   try{
     setAuthMessage('Creant el compte…');
@@ -162,7 +163,7 @@ async function loadExtras(){
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
-  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs();
+  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce();
 }
 (function(){
   const court=$('teamPlayers'); if(!court) return; let d=null;
@@ -370,6 +371,9 @@ async function saveAdminResults(){
 async function processCurrentRound(){
   if(!state.admin||!state.round)return;
   if(!confirm('Processar aquesta jornada? Es calcularan punts i valors a partir dels resultats i dels jugadors destacats.'))return;
+  const chk=await checkRound();
+  if(chk&&(chk.missRes.length||chk.missHl.length)&&!confirm('⚠️ Falten dades:\n'+(chk.missRes.length?'• Resultats: '+chk.missRes.join(', ')+'\n':'')+(chk.missHl.length?'• Destacats: '+chk.missHl.join(', ')+'\n':'')+'\nSegur que vols processar igualment?')) return;
+  if(!(await backupNow())&&!confirm('No s’ha pogut fer la còpia de seguretat. Processar igualment?')) return;
   try{
     const p=await rpc('process_fantasy_round',{p_round_id:state.round.id});
     if(!p.ok) throw new Error((await p.text()).replace(/^"|"$/g,''));
@@ -411,6 +415,7 @@ async function resetRounds(){
 function openAdmin(){showSection('admin');$('adminPinCard').style.display=state.admin?'none':'block';$('adminPanel').style.display=state.admin?'block':'none';}
 
 function init(){
+  if(handleRecovery()) return;
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>showSection(t.dataset.section)));
   document.querySelectorAll('.market-tab').forEach(t=>t.addEventListener('click',()=>{state.marketType=t.dataset.market;document.querySelectorAll('.market-tab').forEach(x=>x.classList.toggle('active',x===t));$('search').value='';renderMarket();}));
   $('search').addEventListener('input',renderMarket); $('teamFilter').addEventListener('change',renderMarket);
@@ -430,6 +435,7 @@ async function adminRpc(name, body){
 }
 async function loadManage(){
   if(!state.admin) return;
+  checkRound();
   const [u,l]=await Promise.all([rpc('admin_list_users',{}), api('admin_log?select=*&order=id.desc&limit=30')]);
   state.adminUsers=u.ok?((await u.json())||[]):[]; state.adminLog=l.ok?await l.json():[];
   renderManage();
@@ -628,6 +634,68 @@ function openTour(start=0){
 }
 function maybeTour(){ const uid=state.session?.user?.id; if(!uid) return; const k='tour_'+uid; if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); setTimeout(()=>openTour(),700); }
 if($('helpBtn')) $('helpBtn').addEventListener('click',()=>openTour());
+
+/* ===== PRIVACITAT, RECUPERACIÓ, COPIA, AVISOS, NOM D'EQUIP ===== */
+function handleRecovery(){
+  const hp=new URLSearchParams(location.hash.slice(1));
+  if(hp.get('type')!=='recovery'||!hp.get('access_token')) return false;
+  state.recoveryToken=hp.get('access_token'); history.replaceState(null,'',location.pathname+location.search);
+  ['loginForm','signupForm','recoverForm'].forEach(id=>$(id).style.display='none'); $('newPassForm').style.display='block'; return true;
+}
+async function recoverPassword(){
+  const email=$('recoverEmail').value.trim(); if(!email) return setAuthMessage('Escriu el teu correu.');
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(location.origin+location.pathname)}`,{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({email})});
+  setAuthMessage(r.ok?'Si el correu existeix, t’hem enviat un enllaç per crear una nova contrasenya. Revisa també la carpeta de correu brossa.':'No s’ha pogut enviar el correu. Torna-ho a provar més tard.',r.ok);
+}
+async function setNewPassword(){
+  const p=$('newPass').value, p2=$('newPass2').value;
+  if(p.length<6) return setAuthMessage('La contrasenya ha de tenir com a mínim 6 caràcters.'); if(p!==p2) return setAuthMessage('Les contrasenyes no coincideixen.');
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/user`,{method:'PUT',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+state.recoveryToken,'Content-Type':'application/json'},body:JSON.stringify({password:p})});
+  if(!r.ok) return setAuthMessage('No s’ha pogut canviar la contrasenya. L’enllaç pot haver caducat: demana’n un de nou.');
+  state.recoveryToken=null; $('newPassForm').style.display='none'; $('loginForm').style.display='block'; setAuthMessage('Contrasenya actualitzada. Ja pots iniciar sessió.',true);
+}
+function showAuthForm(id){ ['loginForm','signupForm','recoverForm','newPassForm'].forEach(x=>$(x).style.display=x===id?'block':'none'); setAuthMessage(''); }
+$('forgotLink').addEventListener('click',e=>{ e.preventDefault(); showAuthForm('recoverForm'); });
+$('backLogin').addEventListener('click',e=>{ e.preventDefault(); showAuthForm('loginForm'); });
+$('recoverBtn').addEventListener('click',recoverPassword); $('newPassBtn').addEventListener('click',setNewPassword);
+['showLogin','showSignup'].forEach(id=>$(id).addEventListener('click',()=>{ $('recoverForm').style.display='none'; $('newPassForm').style.display='none'; }));
+function openPrivacy(){
+  let m=$('privacyModal');
+  if(!m){ m=document.createElement('div'); m.id='privacyModal'; m.className='st-modal'; document.body.appendChild(m); m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('.st-close')) m.classList.remove('open'); }); }
+  m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><h3>Avís de privacitat</h3><div class="tour-body"><p><b>Responsable:</b> Club Bàsquet Alella.</p><p><b>Quines dades guardem:</b> el teu nom d’usuari, el correu electrònic, la contrasenya (xifrada) i la teva activitat al joc (plantilla, fitxatges i classificació).</p><p><b>Per a què:</b> només per gestionar el teu compte i el joc Fantasy del club. No es cedeixen a tercers ni s’utilitzen amb finalitats comercials. Les dades s’emmagatzemen en un servei d’allotjament (Supabase) que actua com a proveïdor tècnic.</p><p><b>Dades del club:</b> els noms (i, si n’hi ha, les imatges) de jugadors i entrenadors només els poden veure els usuaris registrats.</p><p><b>Menors:</b> els menors de 14 anys necessiten l’autorització del pare, la mare o el tutor legal per registrar-se.</p><p><b>Base legal:</b> el teu consentiment, que pots retirar en qualsevol moment.</p><p><b>Els teus drets:</b> pots demanar accedir a les teves dades, rectificar-les o que s’eliminin, adreçant-te al Club Bàsquet Alella.</p></div></div>`;
+  m.classList.add('open');
+}
+$('openPrivacy').addEventListener('click',e=>{ e.preventDefault(); openPrivacy(); });
+
+async function checkRound(){
+  if(!state.round) return null; const rid=state.round.id, el=$('adminChecklist');
+  const [rr,hh]=await Promise.all([api(`team_round_results?round_id=eq.${rid}&select=real_team_id,result`),api(`team_round_highlights?round_id=eq.${rid}&select=real_team_id`)]);
+  const res=rr.ok?await rr.json():[], hl=hh.ok?await hh.json():[];
+  const withRes=new Set(res.filter(x=>x.result).map(x=>String(x.real_team_id))), withHl=new Set(hl.map(x=>String(x.real_team_id)));
+  const missRes=state.teams.filter(t=>!withRes.has(String(t.id))).map(t=>t.name), missHl=state.teams.filter(t=>withRes.has(String(t.id))&&!withHl.has(String(t.id))).map(t=>t.name);
+  if(el) el.innerHTML=`<div>${missRes.length?'⚠️':'✅'} Resultats: ${withRes.size}/${state.teams.length}${missRes.length?' · falten: '+escapeHtml(missRes.join(', ')):''}</div><div>${missHl.length?'⚠️':'✅'} Destacats (equips amb resultat): ${withRes.size-missHl.length}/${withRes.size}${missHl.length?' · falten: '+escapeHtml(missHl.join(', ')):''}</div>`;
+  return {missRes,missHl};
+}
+async function backupNow(){
+  try{
+    const r=await rpc('admin_export',{}); if(!r.ok) throw new Error(await r.text());
+    const blob=new Blob([JSON.stringify(await r.json())],{type:'application/json'}), a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=`copia-fantasy-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000); setAdminMessage('✅ Còpia de seguretat descarregada.'); return true;
+  }catch(e){ alert('⚠️ No s’ha pogut fer la còpia: '+e.message); return false; }
+}
+async function loadAnnounce(){ const r=await api('announcements?active=eq.true&order=id.desc&limit=1&select=id,text'); state.announce=r.ok?((await r.json())[0]||null):null; renderAnnounce(); }
+function renderAnnounce(){ const el=$('announceBanner'), a=state.announce; if(!el) return; el.innerHTML=(a&&!localStorage.getItem('ann_'+a.id))?`<span>📣 ${escapeHtml(a.text)}</span><button data-ann="${a.id}" aria-label="Tancar">✕</button>`:''; }
+$('announceBanner').addEventListener('click',e=>{ const b=e.target.closest('[data-ann]'); if(b){ localStorage.setItem('ann_'+b.dataset.ann,'1'); renderAnnounce(); } });
+$('adminCheckBtn').onclick=checkRound; $('adminBackup').onclick=backupNow;
+$('annPost').onclick=async()=>{ const t=$('annText').value.trim(); if(t.length<3) return alert('Escriu un avís.'); if(await adminRpc('admin_post_announcement',{p_text:t})){ $('annText').value=''; alert('✅ Avís publicat.'); await loadAnnounce(); } };
+$('annClear').onclick=async()=>{ if(confirm('Retirar els avisos actius?')&&await adminRpc('admin_clear_announcements',{})){ alert('✅ Avisos retirats.'); await loadAnnounce(); } };
+$('renameTeam').onclick=async()=>{
+  const n=prompt('Nom del teu equip (3 a 24 caràcters). Deixa-ho buit per tornar al nom d’usuari:',state.team?.custom_name||''); if(n===null) return;
+  const r=await rpc('set_team_name',{p_name:n.trim()});
+  if(!r.ok){ const t=await r.text(); let m=t; try{m=JSON.parse(t).message||t;}catch{} return alert('⚠️ '+m); }
+  alert('✅ Nom actualitzat.'); await loadData();
+};
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
