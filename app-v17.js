@@ -163,7 +163,7 @@ async function loadExtras(){
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
-  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce();
+  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce(); loadTableDuty(); loadAttStats();
 }
 (function(){
   const court=$('teamPlayers'); if(!court) return; let d=null;
@@ -341,7 +341,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadExtras(); maybeTour();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadExtras(); maybeTour(); redeemPending();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -438,7 +438,7 @@ async function loadManage(){
   checkRound();
   const [u,l]=await Promise.all([rpc('admin_list_users',{}), api('admin_log?select=*&order=id.desc&limit=30')]);
   state.adminUsers=u.ok?((await u.json())||[]):[]; state.adminLog=l.ok?await l.json():[];
-  renderManage();
+  renderManage(); loadWeek();
 }
 function coachPrice(c){ return (state.coachMarkets.find(m=>String(m.coach_id)===String(c.id))||{}).current_value??''; }
 function renderManage(){
@@ -460,7 +460,7 @@ function renderManage(){
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
   ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>`).join('')}
   <h4>👤 Usuaris, entrenadors i administradors</h4>
-  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
+  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
   <h4>📜 Registre d’activitat (últims 30)</h4>
   ${(state.adminLog||[]).map(x=>{const d=x.detall||{};const what=[d.name,d.surname].filter(Boolean).join(' ')||d.user_id||d.id||'';return `<div class="mg-log"><small>${new Date(x.created_at).toLocaleString('ca-ES')} · <b>${escapeHtml(who(x.user_id))}</b> · ${escapeHtml(x.tabla)} ${escapeHtml(x.operacio)} · ${escapeHtml(String(what))}</small></div>`;}).join('')||'<small>Encara no hi ha activitat.</small>'}`;
 }
@@ -494,6 +494,7 @@ async function manageClick(e){
   else if(a==='addc'){ if(!v('.mg-n')) return alert('Cal escriure un nom.'); ok=await adminRpc('admin_save_coach',{p_id:null,p_data:{name:v('.mg-n'),surname:v('.mg-s'),current_value:num('.mg-v')},p_team_id:Number(v('.mg-t'))}); msg='Entrenador afegit.'; }
   else if(a==='delc'){ if(!confirm(`Retirar l’entrenador ${nom()}?\n\nSi algú el té fitxat, se li reemborsarà el seu valor de mercat.`)) return; ok=await adminRpc('admin_retire_coach',{p_id:Number(row.dataset.id)}); msg='Entrenador retirat.'; }
   else if(a==='role'){ ok=await adminRpc('admin_set_coach_assignment',{p_pin:'1234',p_user_id:row.dataset.uid,p_coach_id:v('.mg-c')?Number(v('.mg-c')):null}); msg='Rol d’entrenador actualitzat.'; }
+  else if(a==='tbl'){ ok=await adminRpc('admin_set_table_person',{p_user_id:row.dataset.uid,p_on:row.dataset.tbl!=='1'}); msg='Llista de taula actualitzada.'; }
   else if(a==='adm'){ const fer=row.dataset.adm!=='1'; if(!confirm(fer?'Donar permisos d’administrador a aquest usuari?':'Treure els permisos d’administrador a aquest usuari?')) return; ok=await adminRpc('admin_set_admin',{p_user_id:row.dataset.uid,p_admin:fer}); msg='Permisos actualitzats.'; }
   if(ok){ setAdminMessage('✅ '+msg); await loadData(); await loadManage(); }
 }
@@ -619,6 +620,7 @@ const TOUR=[
  {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
  {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada divendres a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
+ {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
  {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar el <b>jugador destacat</b> del teu equip (+5 punts).</p>`},
  {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el divendres a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
 ];
@@ -749,6 +751,8 @@ const TIPS=[
 "Una ratxa llarga pot marcar la diferència entre els primers de la classificació.",
 "Si canvies de capità, fes-ho abans que tanqui el mercat.",
 "Només sumen punts els jugadors dels equips que tenen resultat registrat a la jornada.",
+"Vés a veure un partit del club i escaneja el QR de la taula: +3 punts per partit!",
+"El QR de la taula canvia cada pocs segons: s’ha d’escanejar al pavelló.",
 "Gràcies per jugar! Que guanyi el millor estrateg. 🏆"
 ];
 let tipOrder=[], tipIdx=0;
@@ -761,6 +765,98 @@ function nextTip(){
   setTimeout(()=>{ el.textContent=txt; box.classList.remove('out'); }, el.textContent?350:0);
 }
 setTimeout(nextTip,300); setInterval(nextTip,TIP_MS);
+
+/* ===== PARTITS, TAULA I QR ===== */
+(function(){ const m=location.hash.match(/att=([\w.-]+)/); if(m){ sessionStorage.setItem('pendingAtt',m[1]); history.replaceState(null,'',location.pathname+location.search); } })();
+const fmtMatch=m=>`${new Date(m.match_date+'T12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'})} · ${String(m.start_time).slice(0,5)}`;
+function nextSaturday(){ const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+((6-d.getDay()+7)%7)); return d.toISOString().slice(0,10); }
+function attModal(){
+  let m=$('attModal');
+  if(!m){ m=document.createElement('div'); m.id='attModal'; m.className='st-modal'; document.body.appendChild(m);
+    m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('.st-close')||e.target.closest('[data-close]')) closeAtt(); }); }
+  m.classList.add('open'); document.body.style.overflow='hidden'; return m;
+}
+function closeAtt(){ const m=$('attModal'); if(m){ if(m._stop) m._stop(); m._stop=null; m.classList.remove('open'); } document.body.style.overflow=''; }
+async function redeemToken(token){
+  const r=await rpc('redeem_attendance',{p_token:token}), t=await r.text();
+  if(!r.ok){ let msg=t; try{msg=JSON.parse(t).message||t;}catch{} return {ok:false,msg}; }
+  try{ return {ok:true,...JSON.parse(t)}; }catch{ return {ok:true}; }
+}
+function showAttResult(res){
+  const m=attModal(); if(m._stop){ m._stop(); m._stop=null; }
+  m.innerHTML=res.ok
+   ?`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">✅</div><h3>S’ha escanejat correctament!</h3><p style="text-align:center;font-size:1.1rem"><b>+${res.points||3} punts</b> per al teu equip</p>${res.team?`<p style="text-align:center">🏀 ${escapeHtml(res.team)}${res.rival?' vs '+escapeHtml(res.rival):''}</p>`:''}<div class="tour-nav"><button class="primary" data-close="1" style="margin:auto">Perfecte!</button></div></div>`
+   :`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">⚠️</div><h3>No s’ha pogut registrar</h3><p style="text-align:center">${escapeHtml(res.msg||'Error desconegut.')}</p><div class="tour-nav"><button class="secondary" data-close="1">Tancar</button><button class="primary" id="scanAgain">Tornar a provar</button></div></div>`;
+  if(res.ok){ confetti(); loadData(); } else { const b=$('scanAgain'); if(b) b.onclick=openScanner; }
+}
+function redeemPending(){ const t=sessionStorage.getItem('pendingAtt'); if(!t) return; sessionStorage.removeItem('pendingAtt'); redeemToken(t).then(showAttResult); }
+async function openScanner(){
+  const m=attModal();
+  m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><h3>Escaneja el QR</h3><p class="st-empty" id="scanMsg">Apunta la càmera al QR que hi ha a la taula del partit.</p><div class="scan-box"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div></div><p class="st-empty">També pots escanejar-lo amb la càmera normal del mòbil.</p></div>`;
+  const msg=t=>{ const e=$('scanMsg'); if(e) e.textContent=t; };
+  if(typeof jsQR==='undefined'||!navigator.mediaDevices?.getUserMedia) return msg('No es pot obrir l’escàner en aquest dispositiu. Escaneja el QR amb la càmera normal del mòbil.');
+  let stream, alive=true;
+  m._stop=()=>{ alive=false; if(stream) stream.getTracks().forEach(t=>t.stop()); };
+  try{ stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false}); }
+  catch{ return msg('No s’ha pogut accedir a la càmera. Permet-ne l’accés al navegador o escaneja el QR amb la càmera normal del mòbil.'); }
+  if(!alive){ m._stop(); return; }
+  const v=$('scanVideo'); v.srcObject=stream; await v.play().catch(()=>{});
+  const c=document.createElement('canvas'), x=c.getContext('2d',{willReadFrequently:true});
+  (function tick(){
+    if(!alive) return;
+    if(v.videoWidth){ const k=Math.min(1,640/v.videoWidth); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k); x.drawImage(v,0,0,c.width,c.height);
+      const q=jsQR(x.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:'dontInvert'});
+      if(q&&q.data){ const t=(q.data.match(/att=([\w.-]+)/)||q.data.match(/^(\d+\.\d+\.[0-9a-f]{16})$/)||[])[1];
+        if(t){ alive=false; m._stop(); msg('Comprovant…'); redeemToken(t).then(showAttResult); return; } msg('Aquest QR no és de cap partit del club.'); } }
+    requestAnimationFrame(tick);
+  })();
+}
+async function loadAttStats(){
+  const el=$('attStats'); if(!el) return; const r=await api('match_attendance?select=points'); if(!r.ok) return;
+  const a=await r.json(), n=a.length, s=a.reduce((t,x)=>t+Number(x.points||0),0);
+  el.textContent=n?`Has registrat ${n} ${n===1?'partit':'partits'} · +${s} punts`:'';
+}
+async function loadTableDuty(){
+  const me=state.session?.user?.id; if(!me||!$('tableTab')) return;
+  const from=new Date(Date.now()-864e5).toISOString().slice(0,10);
+  const [a,b]=await Promise.all([api(`match_tables?select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
+  const rows=a.ok?await a.json():[], isP=b.ok&&(await b.json()).length>0;
+  state.myMatches=rows.map(r=>r.club_matches).sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
+  $('tableTab').style.display=(state.myMatches.length||isP)?'':'none';
+  $('tableList').innerHTML=state.myMatches.map(m=>`<div class="mg-row"><b style="flex:1 1 200px">${escapeHtml(fmtMatch(m))}<br><small>🏀 ${escapeHtml(teamName(m.real_team_id))}${m.rival?' vs '+escapeHtml(m.rival):''}</small></b><button class="primary" data-qr="${m.id}">Mostrar QR</button></div>`).join('')||'<p>De moment no tens cap partit assignat aquest cap de setmana.</p>';
+}
+async function openQr(id){
+  const m=attModal(); let timer=null, tick=null, left=20;
+  m._stop=()=>{ clearInterval(timer); clearInterval(tick); };
+  m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><h3>QR del partit</h3><div id="qrInfo" class="st-empty">Carregant…</div><div class="qr-box" id="qrBox"></div><div class="qr-bar"><i id="qrBar" style="width:100%"></i></div><p class="st-empty">El QR canvia cada pocs segons. Els nens l’han d’escanejar des de l’opció <b>“He vingut a veure un partit”</b>.</p><p id="qrScans" style="text-align:center;font-weight:700"></p></div>`;
+  async function refresh(){
+    const r=await rpc('get_match_qr',{p_match_id:id}), t=await r.text();
+    if(!r.ok){ let msg=t; try{msg=JSON.parse(t).message||t;}catch{} clearInterval(timer); clearInterval(tick); $('qrInfo').textContent='⚠️ '+msg; $('qrBox').style.display='none'; return; }
+    const d=JSON.parse(t);
+    const qr=qrcode(0,'M'); qr.addData(`${location.origin}${location.pathname}#att=${d.token}`); qr.make(); $('qrBox').innerHTML=qr.createImgTag(8,8);
+    $('qrInfo').innerHTML=`🏀 <b>${escapeHtml(d.team||'')}</b>${d.rival?' vs '+escapeHtml(d.rival):''} · ${String(d.time).slice(0,5)}`; $('qrScans').textContent=`👀 ${d.scans} ${Number(d.scans)===1?'persona ha':'persones han'} escanejat`; left=20;
+  }
+  await refresh(); timer=setInterval(refresh,20000); tick=setInterval(()=>{ left=Math.max(0,left-1); const b=$('qrBar'); if(b) b.style.width=(left/20*100)+'%'; },1000);
+}
+$('tableList').addEventListener('click',e=>{ const b=e.target.closest('[data-qr]'); if(b) openQr(Number(b.dataset.qr)); });
+$('scanBtn').addEventListener('click',openScanner);
+
+async function loadWeek(){
+  if(!state.admin||!$('wkList')) return; const d=$('wkDate').value||nextSaturday();
+  const mr=await api(`club_matches?match_date=eq.${d}&order=start_time&select=*`), ms=mr.ok?await mr.json():[], ids=ms.map(m=>m.id).join(',');
+  let tb=[],at=[]; if(ids){ const [t,a]=await Promise.all([api(`match_tables?match_id=in.(${ids})&select=match_id,user_id`),api(`match_attendance?match_id=in.(${ids})&select=match_id`)]); tb=t.ok?await t.json():[]; at=a.ok?await a.json():[]; }
+  const us=state.adminUsers||[], pool=us.filter(u=>u.is_table).length?us.filter(u=>u.is_table):us;
+  const opt=sel=>'<option value="">— Ningú —</option>'+pool.map(u=>`<option value="${u.user_id}"${u.user_id===sel?' selected':''}>${escapeHtml(u.username||u.email)}</option>`).join('');
+  $('wkTeam').innerHTML=state.teams.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+  $('wkList').innerHTML=ms.map(m=>{ const u=tb.filter(x=>x.match_id===m.id).map(x=>x.user_id); return `<div class="mg-row" data-mid="${m.id}"><b style="flex:1 1 170px">${String(m.start_time).slice(0,5)} · ${escapeHtml(teamName(m.real_team_id))} vs ${escapeHtml(m.rival||'—')}</b><select class="wk-t1">${opt(u[0])}</select><select class="wk-t2">${opt(u[1])}</select><button class="primary" data-wk="save">Desar taules</button><button class="secondary danger" data-wk="del">Eliminar</button><small>👀 ${at.filter(x=>x.match_id===m.id).length}</small></div>`; }).join('')||'<small>Encara no hi ha partits aquest dia.</small>';
+}
+if($('wkDate')){
+  $('wkDate').value=nextSaturday(); $('wkDate').addEventListener('change',loadWeek);
+  $('wkAdd').onclick=async()=>{ const t=$('wkTime').value; if(!t||!$('wkTeam').value) return alert('Cal indicar l’hora i l’equip.'); if(await adminRpc('admin_save_match',{p_id:null,p_date:$('wkDate').value,p_time:t,p_team:Number($('wkTeam').value),p_rival:$('wkRival').value})){ $('wkRival').value=''; setAdminMessage('✅ Partit afegit.'); loadWeek(); } };
+  $('wkList').addEventListener('click',async e=>{ const b=e.target.closest('[data-wk]'); if(!b) return; const row=b.closest('.mg-row'), id=Number(row.dataset.mid);
+    if(b.dataset.wk==='del'){ if(confirm('Eliminar aquest partit i les seves taules?')&&await adminRpc('admin_delete_match',{p_id:id})){ loadWeek(); } }
+    else{ const ids=[...new Set([row.querySelector('.wk-t1').value,row.querySelector('.wk-t2').value].filter(Boolean))]; if(await adminRpc('admin_set_match_tables',{p_match_id:id,p_user_ids:ids})){ alert('✅ Taules desades.'); loadWeek(); } } });
+}
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
