@@ -23,7 +23,7 @@ function rpc(name, body){ return api(`rpc/${name}`, {method:'POST', body:JSON.st
 function escapeHtml(v){return String(v ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 function teamName(id){return state.teams.find(t=>String(t.id)===String(id))?.name || 'Equip desconegut';}
 function coachName(c){return `${c.name||''} ${c.surname||''}`.trim();}
-function fixImageError(img){const ph=document.createElement('div');ph.className='photo-placeholder';ph.textContent=img.dataset.ph||'📷';img.replaceWith(ph);}
+function fixImageError(img){ if(!img.dataset.logo&&img.dataset.ph!=='🧑‍🏫'){ img.dataset.logo='1'; img.classList.add('logo-ph'); img.src='logo.png'; return; } const ph=document.createElement('div'); ph.className='photo-placeholder'; ph.textContent=img.dataset.ph||'📷'; img.replaceWith(ph); }
 function showSection(id){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));window.scrollTo({top:0,behavior:'smooth'});}
 function setAuthMessage(msg, ok=false){ $('authMessage').textContent=msg||''; $('authMessage').className=ok?'auth-message ok':'auth-message'; }
 function setAdminMessage(msg){ $('adminMessage').textContent=msg||''; const b=$('adminMessageBottom'); if(b) b.textContent=msg||''; }
@@ -96,7 +96,7 @@ function hideAuth(){ $('authGate').style.display='none'; $('appShell').style.dis
 
 function playerCard(p,inTeam=false){
   const dorsal=p.shirt_number ?? '—';
-  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" onerror="fixImageError(this)">` : '<div class="photo-placeholder">📷</div>';
+  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" onerror="fixImageError(this)">` : '<img src="logo.png" alt="" class="player-photo logo-ph">';
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
@@ -137,7 +137,7 @@ function courtOrder(){
 }
 function saveLineup(){ try{localStorage.setItem('lineup_'+state.teamId,JSON.stringify(state.lineup));}catch{} rpc('save_lineup',{p_slots:state.lineup}).catch(()=>{}); }
 function courtCard(p,isCap){
-  const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" data-ph="👤" onerror="fixImageError(this)">`:'<div class="photo-placeholder">👤</div>';
+  const ph=p.photo_url?`<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" data-ph="👤" onerror="fixImageError(this)">`:'<img src="logo.png" alt="" class="logo-ph">';
   return `<div class="pcard${isCap?' cap':''}" data-pid="${p.id}">${isCap?'<span class="cap-badge">C</span>':''}${ph}<b>${escapeHtml(p.name)}</b><small>#${escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))} · ${money(p.current_value)}</small><small class="pts">⭐ Punts: ${f1(state.pts?.[p.id]||0)}</small><div class="acts"><button class="secondary" data-act="cap" data-id="${p.id}" title="Fer capità">${isCap?'⭐':'☆'}</button><button class="secondary" data-act="sell" data-id="${p.id}" title="Vendre">💸</button></div></div>`;
 }
 function benchCard(c,realTeamId){
@@ -205,7 +205,7 @@ function renderClubs(){
     return `<article class="club-card"><div class="club-short">${escapeHtml(t.short_name||'')}</div><h3>${escapeHtml(t.name)}</h3>
     <div class="club-stats"><div><small>Partits guanyats</small><b>${g}/${pj}</b><div class="st-bar"><i style="width:${pj?Math.round(100*g/pj):0}%"></i></div></div><div><small>Popularitat</small><b>${pop===null?'—':pop+'%'}</b><div class="st-bar"><i style="width:${pop||0}%"></i></div></div></div>
     <div class="club-sec">🧑‍🏫 Entrenadors</div><div class="chips">${coaches.map(o=>chip(`data-cid="${o.c.id}" data-ctid="${o.tid}"`,cph(o.c),'🧑‍🏫',coachName(o.c),'Entrenador')).join('')||'<small>Sense entrenadors</small>'}</div>
-    <div class="club-sec">🏀 Jugadors (${players.length})</div><div class="chips">${players.map(p=>chip(`data-pid="${p.id}"`,p.photo_url,'👤',`${p.name} ${p.surname||''}`.trim(),'#'+String(p.shirt_number??'—').replace(/\.0$/,''))).join('')||'<small>Sense jugadors</small>'}</div></article>`;
+    <div class="club-sec">🏀 Jugadors (${players.length})</div><div class="chips">${players.map(p=>chip(`data-pid="${p.id}"`,p.photo_url||'logo.png','👤',`${p.name} ${p.surname||''}`.trim(),'#'+String(p.shirt_number??'—').replace(/\.0$/,''))).join('')||'<small>Sense jugadors</small>'}</div></article>`;
   }).join('');
 }
 function renderResults(){
@@ -340,7 +340,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadExtras();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadExtras(); maybeTour();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -448,11 +448,11 @@ function renderManage(){
   box.innerHTML=`
   <h4>🏀 Jugadors (${pl.length})</h4>
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-d" placeholder="Dorsal" inputmode="numeric"><input class="mg-v" placeholder="Valor M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addp">Afegir jugador</button></div>
-  ${pl.slice(0,40).map(p=>`<div class="mg-row" data-id="${p.id}"><input class="mg-n" value="${escapeHtml(p.name||'')}"><input class="mg-s" value="${escapeHtml(p.surname||'')}"><input class="mg-d" value="${escapeHtml(p.shirt_number??'')}" inputmode="numeric"><input class="mg-v" value="${escapeHtml(p.current_value??'')}" inputmode="decimal"><select class="mg-t">${teamOpts(p.real_team_id)}</select>${photo('players')}<button class="primary" data-mg="savep">Desar</button><button class="secondary danger" data-mg="delp">Retirar</button></div>`).join('')}
+  ${pl.slice(0,40).map(p=>`<div class="mg-row" data-id="${p.id}"><input class="mg-n" value="${escapeHtml(p.name||'')}"><input class="mg-s" value="${escapeHtml(p.surname||'')}"><input class="mg-d" value="${escapeHtml(p.shirt_number??'')}" inputmode="numeric"><input class="mg-v" value="${escapeHtml(p.current_value??'')}" inputmode="decimal"><select class="mg-t">${teamOpts(p.real_team_id)}</select>${photo('players')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savep">Desar</button><button class="secondary danger" data-mg="delp">Retirar</button></div>`).join('')}
   ${pl.length>40?'<small>Mostrant 40. Usa el cercador per afinar.</small>':''}
   <h4>🧑‍🏫 Entrenadors (${cs.length})</h4>
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
-  ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>`).join('')}
+  ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>`).join('')}
   <h4>👤 Usuaris, entrenadors i administradors</h4>
   ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
   <h4>📜 Registre d’activitat (últims 30)</h4>
@@ -479,6 +479,7 @@ async function manageClick(e){
   const v=s=>(row.querySelector(s)?.value||'').trim();
   const num=s=>v(s)===''?null:Number(v(s).replace(',','.'));
   const nom=()=>`${v('.mg-n')} ${v('.mg-s')}`.trim();
+  if(a==='crop') return openCrop(row.querySelector('[data-mgphoto]').dataset.mgphoto,Number(row.dataset.id));
   let ok=false, msg='';
   if(a==='savep'){ ok=await adminRpc('admin_save_player',{p_id:Number(row.dataset.id),p_data:{name:v('.mg-n'),surname:v('.mg-s'),shirt_number:num('.mg-d'),current_value:num('.mg-v'),real_team_id:Number(v('.mg-t'))}}); msg='Jugador desat.'; }
   else if(a==='addp'){ if(!v('.mg-n')) return alert('Cal escriure un nom.'); ok=await adminRpc('admin_save_player',{p_id:null,p_data:{name:v('.mg-n'),surname:v('.mg-s'),shirt_number:num('.mg-d'),current_value:num('.mg-v'),real_team_id:Number(v('.mg-t'))}}); msg='Jugador afegit.'; }
@@ -555,7 +556,7 @@ async function openStats(id,kind='player',teamId=null){
     m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('.st-close')) closeStats(); });
     document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeStats(); }); }
   const photo=isC?((p.photo_url&&p.photo_url.includes('/storage/v1/'))?p.photo_url:`entrenador-${id}.jpeg`):p.photo_url, em=isC?'🧑‍🏫':'👤';
-  const ph=photo?`<img src="${escapeHtml(photo)}" alt="" data-ph="${em}" onerror="fixImageError(this)">`:`<div class="photo-placeholder">${em}</div>`;
+  const ph=photo?`<img src="${escapeHtml(photo)}" alt="" data-ph="${em}" onerror="fixImageError(this)">`:(isC?`<div class="photo-placeholder">${em}</div>`:'<img src="logo.png" alt="" class="logo-ph">');
   const nm=isC?coachName(p):`${p.name} ${p.surname||''}`;
   const head=`<button class="st-close" aria-label="Tancar">✕</button><div class="st-head">${ph}<div><h3>${escapeHtml(nm)}</h3><small>🏀 ${escapeHtml(teamName(tid))} · ${isC?'Entrenador':'#'+escapeHtml(String(p.shirt_number??'—').replace(/\.0$/,''))}</small></div></div>`;
   m.innerHTML=`<div class="st-card">${head}<p>Carregant estadístiques…</p></div>`; m.classList.add('open'); document.body.style.overflow='hidden';
@@ -574,6 +575,59 @@ async function openStats(id,kind='player',teamId=null){
   m.innerHTML=`<div class="st-card">${head}${body}</div>`;
 }
 document.addEventListener('click',e=>{ if(Date.now()-(window.__dragged||0)<400) return; const act=e.target.closest('[data-act]'); if(act){ const id=Number(act.dataset.id); return act.dataset.act==='cap'?setCaptain(id):sellPlayer(id); } if(e.target.closest('button,a,input,select,label,#statsModal')) return; const c=e.target.closest('[data-pid]'); if(c) return openStats(Number(c.dataset.pid)); const k=e.target.closest('[data-cid]'); if(k) openStats(Number(k.dataset.cid),'coach',k.dataset.ctid); });
+
+function openCrop(kind,id){
+  const p=(kind==='players'?state.players:state.coaches).find(x=>Number(x.id)===id); if(!p) return;
+  const url=kind==='players'?p.photo_url:((p.photo_url&&p.photo_url.includes('/storage/v1/'))?p.photo_url:`entrenador-${id}.jpeg`);
+  if(!url) return alert('Aquest jugador no té foto per reenquadrar. Puja’n una amb el botó 📷.');
+  const m=document.createElement('div'); m.className='st-modal open'; m.id='cropModal';
+  m.innerHTML=`<div class="st-card"><button class="st-close" aria-label="Tancar">✕</button><h3 class="crop-title">Reenquadrar foto</h3><p class="st-empty">Arrossega la foto i usa el control per ampliar-la. El cercle mostra com es veurà.</p><div class="crop-box" id="cropBox"><img id="cropImg" crossorigin="anonymous" alt=""><div class="crop-mask"></div></div><input id="cropZoom" type="range" min="1" max="3" step="0.01" value="1" style="width:100%"><div class="mg-row"><button class="primary" id="cropSave">Desar enquadrament</button><button class="secondary" id="cropCancel">Cancel·lar</button></div></div>`;
+  document.body.appendChild(m); document.body.style.overflow='hidden';
+  const close=()=>{ m.remove(); document.body.style.overflow=''; };
+  const img=$('cropImg'), box=$('cropBox'), B=box.clientWidth; let z=1,ox=0,oy=0,w=1,h=1,k0=1,drag=null;
+  const apply=()=>{ const W=w*k0*z,H=h*k0*z; ox=Math.min(0,Math.max(B-W,ox)); oy=Math.min(0,Math.max(B-H,oy)); Object.assign(img.style,{width:W+'px',height:H+'px',left:ox+'px',top:oy+'px'}); };
+  img.onload=()=>{ w=img.naturalWidth; h=img.naturalHeight; k0=B/Math.min(w,h); ox=(B-w*k0)/2; oy=0; apply(); };
+  img.onerror=()=>{ alert('No s’ha pogut carregar la foto.'); close(); };
+  img.src=url;
+  box.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY,ox,oy}; box.setPointerCapture(e.pointerId); });
+  box.addEventListener('pointermove',e=>{ if(!drag) return; ox=drag.ox+e.clientX-drag.x; oy=drag.oy+e.clientY-drag.y; apply(); });
+  box.addEventListener('pointerup',()=>{ drag=null; });
+  $('cropZoom').addEventListener('input',e=>{ const cx=(B/2-ox)/(w*k0*z), cy=(B/2-oy)/(h*k0*z); z=Number(e.target.value); ox=B/2-cx*w*k0*z; oy=B/2-cy*h*k0*z; apply(); });
+  m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('.st-close')||e.target.id==='cropCancel') close(); });
+  $('cropSave').onclick=()=>{
+    try{
+      const f=k0*z, c=document.createElement('canvas'); c.width=c.height=600;
+      c.getContext('2d').drawImage(img,-ox/f,-oy/f,B/f,B/f,0,0,600,600);
+      c.toBlob(async blob=>{ close(); await uploadPhoto(kind,id,blob); },'image/jpeg',.88);
+    }catch(err){ alert('⚠️ No s’ha pogut desar l’enquadrament: '+err.message); }
+  };
+}
+/* ===== GUIA PER A NOUS USUARIS ===== */
+const TOUR=[
+ {i:'🏀',t:'Benvingut al Fantasy!',h:`<p>Crea el teu equip ideal amb <b>jugadors i entrenadors reals</b> del Club Bàsquet Alella. Quan els seus equips guanyen, <b>tu sumes punts</b> i puges a la classificació.</p><ul><li>Comences amb <b>120 M€</b> de pressupost.</li><li>Pots tenir <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Cada jornada es calculen els punts amb els resultats reals.</li></ul><p>Aquesta guia t’explica cada cosa en un minut.</p>`},
+ {i:'📋',t:'La pantalla d’inici',go:'home',h:`<p>A la targeta taronja de dalt tens el teu resum:</p><ul><li><b>Pressupost</b>: els M€ que et queden per fitxar.</li><li><b>8/8 jugadors · 2/2 entrenadors</b>: quants en tens de cada.</li><li><b>Jornada</b>: la jornada en curs.</li><li><b>Els teus punts</b>: els que portes acumulats.</li></ul><p>Sota hi ha la franja del <b>mercat</b>: 🟢 obert (amb compte enrere), ⏳ queda poc, o 🔒 tancat.</p>`},
+ {i:'🧭',t:'Les pestanyes',h:`<div class="tour-legend"><b>⌂ Inici</b><span>Resum de la teva situació</span><b>👕 Plantilla</b><span>El teu equip sobre la pista</span><b>🏀 Mercat</b><span>Fitxar jugadors i entrenadors</span><b>🏟️ Equips</b><span>Els equips reals, amb les seves estadístiques</span><b>🏆 Classificació</b><span>Qui va primer</span><b>📅 Resultats</b><span>Resultats reals de cada jornada</span><b>ℹ️ Regles</b><span>Totes les normes</span></div>`},
+ {i:'🛒',t:'El mercat',go:'market',h:`<p>Aquí fitxes jugadors i entrenadors. Canvia entre <b>Jugadors</b> i <b>Entrenadors</b> a dalt, i fes servir el cercador i el filtre d’equip.</p><ul><li>Prem <span class="demo">Fitxar · 10,0 M€</span> per fitxar. A la compra s’hi suma una <b>comissió del 5%</b>.</li><li>Toca la targeta (no el botó) per veure’n les <b>estadístiques</b>.</li><li>Cada targeta mostra el <b>valor</b> i els <b>punts</b> que porta.</li></ul>`},
+ {i:'👕',t:'La teva plantilla',go:'team',h:`<p>És el teu equip: els <b>entrenadors a dalt</b> i els <b>8 jugadors</b> sobre la pista.</p><div class="tour-legend"><span class="demo">C</span><span>El <b>capità</b> del teu equip</span><span class="demo grey">☆ / ⭐</span><span>Fer capità aquest jugador</span><span class="demo grey">💸</span><span>Vendre’l: et retornen el valor actual, sense comissió</span><span class="demo grey">+</span><span>Lloc buit: et porta al mercat per fitxar-ne un</span></div><p>Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega.</p>`},
+ {i:'📊',t:'Estadístiques',h:`<p>Toca qualsevol targeta de jugador o d’entrenador per obrir la seva fitxa:</p><ul><li>Punts totals, victòries, ratxa i valor.</li><li>Gràfica de l’<b>evolució del valor</b> i dels <b>punts per jornada</b>.</li><li>La <b>popularitat</b>: quants equips Fantasy el tenen.</li></ul><p>A <b>Equips</b> hi ha tots els integrants de cada equip real, amb els partits guanyats i la popularitat.</p>`},
+ {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
+ {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada divendres a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
+ {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
+ {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar el <b>jugador destacat</b> del teu equip (+5 punts).</p>`},
+ {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el divendres a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
+];
+function openTour(start=0){
+  let i=start, m=$('tourModal');
+  if(!m){ m=document.createElement('div'); m.id='tourModal'; m.className='st-modal'; document.body.appendChild(m); }
+  const close=()=>{ m.classList.remove('open'); document.body.style.overflow=''; };
+  const draw=()=>{ const s=TOUR[i], last=i===TOUR.length-1;
+    m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">${s.i}</div><h3>${s.t}</h3><div class="tour-body">${s.h}</div><div class="tour-dots">${TOUR.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}</div><div class="tour-nav"><button class="secondary" data-t="prev" ${i?'':'disabled'}>← Enrere</button>${s.go?'<button class="secondary" data-t="go">Veure-ho</button>':''}<button class="primary" data-t="next">${last?'Començar! 🏀':'Següent →'}</button></div></div>`; };
+  m.onclick=e=>{ if(e.target===m||e.target.closest('.st-close')) return close(); const b=e.target.closest('[data-t]'); if(!b) return; const a=b.dataset.t;
+    if(a==='prev'&&i>0){ i--; draw(); } else if(a==='next'){ if(i<TOUR.length-1){ i++; draw(); } else close(); } else if(a==='go'){ const g=TOUR[i].go; close(); showSection(g); } };
+  draw(); m.classList.add('open'); document.body.style.overflow='hidden';
+}
+function maybeTour(){ const uid=state.session?.user?.id; if(!uid) return; const k='tour_'+uid; if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); setTimeout(()=>openTour(),700); }
+if($('helpBtn')) $('helpBtn').addEventListener('click',()=>openTour());
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
