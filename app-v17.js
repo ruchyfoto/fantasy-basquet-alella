@@ -697,6 +697,71 @@ $('renameTeam').onclick=async()=>{
   alert('✅ Nom actualitzat.'); await loadData();
 };
 
+/* ===== CONSELLS AUTOMÀTICS ===== */
+const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
+const TIPS=[
+"Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
+"Una plantilla completa té 8 jugadors i 2 entrenadors.",
+"Només pots tenir 1 jugador de cada equip real: diversifica!",
+"Comprar té una comissió del 5%; vendre no en té cap.",
+"Pots fer un màxim de 2 fitxatges per jornada (abans dels primers resultats, els que vulguis).",
+"o|El mercat tanca el divendres a les 23:59. No ho deixis per a l’últim minut!",
+"c|El mercat és tancat: aprofita per revisar la plantilla i planificar els pròxims fitxatges.",
+"o|Vigila el compte enrere de dalt de tot: marca quan tanca el mercat.",
+"El mercat no es reobre fins que comença la jornada següent.",
+"Amb el mercat tancat tampoc es pot vendre ni canviar de capità.",
+"Cada victòria suma punts: 12 la primera, 13 la segona seguida, 14 la tercera…",
+"La ratxa és or: cada victòria seguida d’un jugador suma 1 punt més.",
+"Un jugador destacat suma +5 punts extra, encara que el seu equip perdi.",
+"El capità suma +10 punts extra a l’equip quan guanya. Tria’l amb criteri!",
+"Abans del tancament, revisa si el teu capità té un partit amb opcions de victòria.",
+"Només compten els punts que genera un jugador mentre és a la teva plantilla.",
+"Fitxar un jugador després d’una gran jornada no et dona els punts que ja ha fet.",
+"Els entrenadors també sumen punts quan el seu equip guanya, amb bonus per ratxa.",
+"El valor de jugadors i entrenadors canvia després de cada jornada segons els resultats.",
+"Amb el mercat obert, pots vendre un jugador i recuperar-ne el valor actual.",
+"Mira les estadístiques abans de fitxar: toca la targeta del jugador.",
+"La gràfica d’evolució del valor t’ajuda a detectar qui puja.",
+"La popularitat indica quants equips tenen un jugador: un de poc popular et fa diferent.",
+"Un jugador d’un equip amb bona ratxa té més opcions de sumar punts extra.",
+"Fitxa abans que un jugador pugi de valor, no després.",
+"No gastis tot el pressupost el primer dia: guarda marge per a les oportunitats.",
+"Fixa’t en la ratxa actual de cada jugador a la seva fitxa.",
+"Un bon entrenador amb ratxa és una inversió rentable.",
+"Consulta la pestanya Resultats per veure com van els equips abans de decidir.",
+"Els punts s’actualitzen quan l’administrador processa la jornada, un cop entrats els resultats.",
+"Toca una targeta per veure estadístiques i gràfiques d’un jugador o entrenador.",
+"Pots ordenar la plantilla arrossegant els jugadors (al mòbil, mantén premuda la targeta).",
+"A la pista, ☆ fa capità un jugador i 💸 el ven.",
+"Un “+” a la pista és un lloc buit: toca’l i aniràs directe al mercat.",
+"Al mercat, canvia entre Jugadors i Entrenadors amb les pestanyes de dalt.",
+"Fes servir el cercador i el filtre d’equip per trobar jugadors més ràpid.",
+"A Classificació, la teva fila porta l’etiqueta TU.",
+"A Equips veuràs tots els integrants de cada equip i els seus partits guanyats.",
+"Pots posar nom al teu equip des de Plantilla (✏️ Nom de l’equip).",
+"Si tens dubtes, el botó ❓ Guia et torna a explicar tot el joc.",
+"Afegeix la web a la pantalla d’inici del mòbil i accedeix-hi com si fos una app.",
+"La classificació es mou cada jornada: encara ets a temps de remuntar!",
+"Els tres primers de la classificació s’emporten les medalles 🥇🥈🥉.",
+"Cada jornada és una nova oportunitat: revisa la teva plantilla abans de cada tancament.",
+"Comparteix el joc amb la família i els amics del club i competiu junts!",
+"Anima l’equip als partits: els resultats reals són els que fan pujar els punts. 🏀",
+"Una ratxa llarga pot marcar la diferència entre els primers de la classificació.",
+"Si canvies de capità, fes-ho abans que tanqui el mercat.",
+"Només sumen punts els jugadors dels equips que tenen resultat registrat a la jornada.",
+"Gràcies per jugar! Que guanyi el millor estrateg. 🏆"
+];
+let tipOrder=[], tipIdx=0;
+function tipPool(){ const closed=marketClosed(); return TIPS.filter(t=>!/^[oc]\|/.test(t)||(t[0]==='o'&&!closed)||(t[0]==='c'&&closed)).map(t=>t.replace(/^[oc]\|/,'')); }
+function nextTip(){
+  const el=$('tipText'), box=$('tipStrip'); if(!el||document.hidden) return;
+  const pool=tipPool(); if(!pool.length) return;
+  if(tipIdx>=tipOrder.length||tipOrder.length!==pool.length){ tipOrder=[...pool].sort(()=>Math.random()-.5); tipIdx=0; }
+  const txt=tipOrder[tipIdx++]; box.classList.add('out');
+  setTimeout(()=>{ el.textContent=txt; box.classList.remove('out'); }, el.textContent?350:0);
+}
+setTimeout(nextTip,300); setInterval(nextTip,TIP_MS);
+
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
 function playCourt(){ const c=$('teamPlayers'); if(!c) return; c.classList.add('done'); c.classList.remove('play'); void c.offsetWidth; c.classList.add('play'); setTimeout(()=>c.classList.remove('play'),1700); }
