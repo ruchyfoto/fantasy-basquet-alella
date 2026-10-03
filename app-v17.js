@@ -377,7 +377,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -1008,7 +1008,24 @@ function initPush(){
   }catch(e){ console.warn('push',e); }
 }
 
-const APP_VERSION=55; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+
+/* ===== Instal·lar l'app (PWA) ===== */
+let _installEv=null;
+function renderInstall(){
+  const card=$('installCard'); if(!card) return;
+  const standalone=!!(window.navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(standalone){ card.style.display='none'; return; }
+  if(_installEv){ card.style.display=''; $('installInfo').textContent='Tingues el Fantasy a la pantalla d’inici, com una app, a pantalla completa.'; $('installBtn').style.display=''; }
+  else if(ios){ card.style.display=''; $('installInfo').innerHTML='Per tenir-la com a app: toca <b>Compartir</b> (el quadrat amb la fletxa) a Safari i tria <b>Afegeix a la pantalla d’inici</b>. Això també és necessari per rebre notificacions a l’iPhone.'; $('installBtn').style.display='none'; }
+  else card.style.display='none';
+}
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); _installEv=e; renderInstall(); });
+window.addEventListener('appinstalled',()=>{ _installEv=null; renderInstall(); });
+document.addEventListener('click',async e=>{ if(e.target&&e.target.id==='installBtn'&&_installEv){ _installEv.prompt(); try{ await _installEv.userChoice; }catch{} _installEv=null; renderInstall(); } });
+
+
+const APP_VERSION=56; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;

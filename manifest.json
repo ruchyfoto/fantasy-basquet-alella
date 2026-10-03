@@ -2,12 +2,31 @@
   "name": "Fantasy Bàsquet Alella",
   "short_name": "Fantasy Alella",
   "description": "Fantasy del Club Bàsquet Alella",
+  "lang": "ca",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#03281D",
   "theme_color": "#03281D",
   "icons": [
-    { "src": "logo.png", "sizes": "any", "type": "image/png", "purpose": "any" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

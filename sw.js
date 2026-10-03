@@ -1,14 +1,35 @@
-// Service worker: rep les notificacions push i les mostra
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+// Service worker: notificacions push + còpia local de la pàgina per obrir-la sense connexió
+const CACHE = 'fantasy-alella-v1';
+const SHELL = ['./', 'index.html', 'styles.css', 'config.js', 'logo.png', 'icon-192.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+
+// Sempre intenta la xarxa primer (així es veuen les actualitzacions); sense connexió, usa la còpia guardada.
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // Supabase i CDN no es toquen
+  e.respondWith(
+    fetch(req).then(res => {
+      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())))
+  );
+});
 
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.title || 'Fantasy Bàsquet Alella', {
     body: d.body || '',
-    icon: 'logo.png',
-    badge: 'logo.png',
+    icon: 'icon-192.png',
+    badge: 'badge-96.png',
     tag: d.tag || undefined,
     data: { url: d.url || './' }
   }));
