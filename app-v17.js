@@ -75,6 +75,7 @@ async function login(){
 }
 
 function logout(){
+  _isClub=null;
   try{ pushDetach(); }catch(e){}
   state.session=null; state.teamId=null; state.team=null; state.username='';
   localStorage.removeItem('fantasySession');
@@ -299,11 +300,11 @@ async function loadCoachContext(){
     const cpR=await api(`coach_profiles?select=coach_id&user_id=eq.${encodeURIComponent(state.session?.user?.id||'')}&limit=1`);
     if(!cpR.ok) throw new Error(await cpR.text());
     const cps=await cpR.json();
-    const coachId=cps[0]?.coach_id;
-    if(!coachId){ state.coachContext=[]; const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='none'; return; }
+    const coachId=cps[0]?.coach_id, club=await isClubAccount();
+    if(!coachId&&!club){ state.coachContext=[]; const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='none'; return; }
 
     const [ctR,roundR]=await Promise.all([
-      api(`coach_teams?coach_id=eq.${coachId}&select=real_team_id`),
+      club?Promise.resolve({ok:true,json:async()=>state.teams.map(t=>({real_team_id:t.id}))}):api(`coach_teams?coach_id=eq.${coachId}&select=real_team_id`),
       api('fantasy_rounds?is_active=eq.true&select=id,round_number&order=round_number.desc&limit=1')
     ]);
     if(!ctR.ok) throw new Error(await ctR.text());
@@ -319,7 +320,7 @@ async function loadCoachContext(){
       api(`real_teams?id=in.(${idList})&select=id,name`),
       api(`team_round_results?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,result`),
       api(`team_round_highlights?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,player_id,pos&order=pos`),
-      api(`coaches?id=eq.${coachId}&select=name,surname&limit=1`)
+      club?Promise.resolve({ok:true,json:async()=>[{name:'Club Bàsquet',surname:'Alella'}]}):api(`coaches?id=eq.${coachId}&select=name,surname&limit=1`)
     ]);
     for(const r of [teamsR,resR,highR,coachR]) if(!r.ok) throw new Error(await r.text());
     const teams=await teamsR.json(), results=await resR.json(), highlights=await highR.json(), coaches=await coachR.json();
@@ -833,14 +834,17 @@ async function loadAttStats(){
   const a=await r.json(), n=a.length, s=a.reduce((t,x)=>t+Number(x.points||0),0);
   el.textContent=n?`Has registrat ${n} ${n===1?'partit':'partits'} · +${s} punts`:'';
 }
+let _isClub=null;
+async function isClubAccount(){ if(_isClub!==null) return _isClub; try{ const r=await api('club_accounts?select=user_id'); _isClub=r.ok?((await r.json()).length>0):false; }catch{ _isClub=false; } return _isClub; }
 async function loadTableDuty(){
   const me=state.session?.user?.id; if(!me||!$('tableTab')) return;
   const from=new Date(Date.now()-864e5).toISOString().slice(0,10);
-  const [a,b]=await Promise.all([api(`match_tables?user_id=eq.${me}&select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
-  const rows=a.ok?await a.json():[], isP=b.ok&&(await b.json()).length>0;
-  state.myMatches=[...new Map(rows.map(r=>r.club_matches).filter(Boolean).map(m=>[m.id,m])).values()].sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
+  const club=await isClubAccount();
+  const [a,b]=await Promise.all([club?api(`club_matches?match_date=gte.${from}&select=id,match_date,start_time,real_team_id,rival`):api(`match_tables?user_id=eq.${me}&select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
+  const rows=a.ok?await a.json():[], isP=club||(b.ok&&(await b.json()).length>0);
+  state.myMatches=[...new Map((club?rows:rows.map(r=>r.club_matches)).filter(Boolean).map(m=>[m.id,m])).values()].sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
   $('tableTab').style.display=(state.myMatches.length||isP)?'':'none';
-  $('tableList').innerHTML=state.myMatches.map(m=>`<div class="mg-row"><b style="flex:1 1 200px">${escapeHtml(fmtMatch(m))}<br><small>🏀 ${escapeHtml(teamName(m.real_team_id))}${m.rival?' vs '+escapeHtml(m.rival):''}</small></b><button class="primary" data-qr="${m.id}">Mostrar QR</button></div>`).join('')||'<p>De moment no tens cap partit assignat aquest cap de setmana.</p>';
+  $('tableList').innerHTML=state.myMatches.map(m=>`<div class="mg-row"><b style="flex:1 1 200px">${escapeHtml(fmtMatch(m))}<br><small>🏀 ${escapeHtml(teamName(m.real_team_id))}${m.rival?' vs '+escapeHtml(m.rival):''}</small></b><button class="primary" data-qr="${m.id}">Mostrar QR</button></div>`).join('')||(club?'<p>De moment no hi ha cap partit programat.</p>':'<p>De moment no tens cap partit assignat aquest cap de setmana.</p>');
 }
 async function openQr(id){
   const m=attModal(); let timer=null, tick=null, left=20;
@@ -975,7 +979,7 @@ function initPush(){
   }catch(e){ console.warn('push',e); }
 }
 
-const APP_VERSION=50; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=51; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
