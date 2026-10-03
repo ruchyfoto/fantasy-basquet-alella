@@ -634,7 +634,7 @@ const TOUR=[
  {i:'👕',t:'La teva plantilla',go:'team',h:`<p>És el teu equip: els <b>entrenadors a dalt</b> i els <b>8 jugadors</b> sobre la pista.</p><div class="tour-legend"><span class="demo">C</span><span>El <b>capità</b>: suma <b>+10 punts extra</b> al teu equip cada jornada que <b>guanya</b></span><span class="demo grey">☆ / ⭐</span><span>Fer capità aquest jugador</span><span class="demo grey">💸</span><span>Vendre’l: et retornen el valor actual, sense comissió</span><span class="demo grey">+</span><span>Lloc buit: et porta al mercat per fitxar-ne un</span></div><p>Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega.</p>`},
  {i:'📊',t:'Estadístiques',h:`<p>Toca qualsevol targeta de jugador o d’entrenador per obrir la seva fitxa:</p><ul><li>Punts totals, victòries, ratxa i valor.</li><li>Gràfica de l’<b>evolució del valor</b> i dels <b>punts per jornada</b>.</li><li>La <b>popularitat</b>: quants equips Fantasy el tenen.</li></ul><p>A <b>Equips</b> hi ha tots els integrants de cada equip real, amb els partits guanyats i la popularitat.</p>`},
  {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
- {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
+ {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Màxim <b>1 jugador de cada equip real</b>, amb una excepció: <b>a partir del 5 d’octubre pots tenir-ne 2 del mateix equip</b>, però només d’un equip.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
  {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs els <b>partits a casa d’aquesta jornada</b>, amb l’hora i l’equip.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
  {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar els <b>3 jugadors destacats</b> del teu equip per ordre d’importància (+7, +5 i +3 punts).</p>`},
@@ -720,7 +720,7 @@ const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
 const TIPS=[
 "Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
 "Una plantilla completa té 8 jugadors i 2 entrenadors.",
-"Només pots tenir 1 jugador de cada equip real: diversifica!",
+"Pots tenir 2 jugadors del mateix equip real, però només una vegada: la resta, d’equips diferents!",
 "Comprar té una comissió del 5%; vendre no en té cap.",
 "Pots fer un màxim de 2 fitxatges per jornada (abans dels primers resultats, els que vulguis).",
 "o|El mercat tanca el dijous a les 23:59. No ho deixis per a l’últim minut!",
@@ -907,7 +907,7 @@ function renderHomeMatches(){
 }
 setInterval(renderHomeMatches,60000);
 
-const APP_VERSION=48; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=49; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
