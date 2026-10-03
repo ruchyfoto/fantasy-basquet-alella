@@ -215,7 +215,23 @@ function renderResults(){
   if(!state.round){$('resultsList').innerHTML='<div class="empty-state">No hi ha jornada activa.</div>';return;}
   api(`team_round_results?round_id=eq.${state.round.id}&select=real_team_id,result&order=real_team_id`).then(async r=>{if(!r.ok)throw new Error(await r.text());const rows=await r.json();$('resultsList').innerHTML=rows.length?rows.map(x=>`<div class="match"><div><b>${escapeHtml(teamName(x.real_team_id))}</b></div><strong>${x.result==='win'?'🟢 Victòria':'🔴 Derrota'}</strong></div>`).join(''):'<div class="empty-state"><div class="empty-icon">🏀</div><h3>Encara no hi ha resultats</h3></div>';}).catch(e=>{$('resultsList').innerHTML=`<div class="empty-state">No s'han pogut carregar els resultats.<br><small>${escapeHtml(e.message)}</small></div>`;});
 }
+document.querySelectorAll('.rk-tab').forEach(t=>t.addEventListener('click',()=>{
+  const teams=t.dataset.rk==='teams';
+  document.querySelectorAll('.rk-tab').forEach(x=>x.classList.toggle('active',x===t));
+  $('rkFantasy').style.display=teams?'none':''; $('rkTeams').style.display=teams?'':'none';
+  $('rkSub').textContent=teams?'Quants partits han anat a veure les persones de cada equip del club.':'Punts acumulats de tots els equips Fantasy.';
+  if(teams) renderTeamAtt();
+}));
+async function renderTeamAtt(){
+  const box=$('teamAttList'); if(!box) return;
+  try{
+    const r=await rpc('get_attendance_team_ranking',{}); const t=await r.text(); if(!r.ok) throw new Error(t.slice(0,140));
+    const rows=JSON.parse(t||'[]'), max=Math.max(1,...rows.map(x=>Number(x.scans)));
+    box.innerHTML=rows.some(x=>Number(x.scans)>0)?rows.map((x,i)=>`<div class="ranking-row${i<3&&Number(x.scans)>0?' top'+(i+1):''}" style="--i:${i}"><span class="ranking-pos">${Number(x.scans)>0?(['🥇','🥈','🥉'][i]||i+1):'·'}</span><div class="ranking-name"><b>${escapeHtml(x.team_name)}</b><small>${x.people} ${Number(x.people)===1?'persona':'persones'}${Number(x.players)?` · ${(Number(x.scans)/Number(x.players)).toFixed(1).replace('.',',')} per jugador`:''}</small></div><strong>${x.scans} ${Number(x.scans)===1?'partit':'partits'}</strong></div>`).join(''):'<div class="empty-state">Encara no hi ha cap assistència registrada. Escaneja el QR d’un partit!</div>';
+  }catch(e){ box.innerHTML=`<div class="empty-state">No s’ha pogut carregar l’afició per equips.<br><small>${escapeHtml(e.message)}</small></div>`; }
+}
 async function renderRanking(){
+  renderTeamAtt();
   const box=$('rankingList'); if(!box)return;
   try{
     const r=await rpc('get_fantasy_classification',{}); const txt=await r.text(); if(!r.ok)throw new Error(txt.replace(/^"|"$/g,''));
@@ -795,8 +811,8 @@ function attModal(){
   m.classList.add('open'); document.body.style.overflow='hidden'; return m;
 }
 function closeAtt(){ const m=$('attModal'); if(m){ if(m._stop) m._stop(); m._stop=null; m.classList.remove('open'); } document.body.style.overflow=''; }
-async function redeemToken(token){
-  const r=await rpc('redeem_attendance',{p_token:token}), t=await r.text();
+async function redeemToken(token,teamId){
+  const r=await rpc('redeem_attendance',{p_token:token,p_team_id:Number(teamId)}), t=await r.text();
   if(!r.ok){ let msg=t; try{msg=JSON.parse(t).message||t;}catch{} return {ok:false,msg}; }
   try{ return {ok:true,...JSON.parse(t)}; }catch{ return {ok:true}; }
 }
@@ -807,8 +823,18 @@ function showAttResult(res){
    :`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">⚠️</div><h3>No s’ha pogut registrar</h3><p style="text-align:center">${escapeHtml(res.msg||'Error desconegut.')}</p><div class="tour-nav"><button class="secondary" data-close="1">Tancar</button><button class="primary" id="scanAgain">Tornar a provar</button></div></div>`;
   if(res.ok){ confetti(); loadData(); } else { const b=$('scanAgain'); if(b) b.onclick=openScanner; }
 }
-function redeemPending(){ const t=sessionStorage.getItem('pendingAtt'); if(!t) return; sessionStorage.removeItem('pendingAtt'); redeemToken(t).then(showAttResult); }
+function pickAttTeam(){
+  return new Promise(resolve=>{
+    const m=attModal(); let last=''; try{ last=localStorage.getItem('attTeam')||''; }catch{}
+    const opts=(state.teams||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ca')).map(t=>`<option value="${escapeHtml(t.id)}"${String(t.id)===last?' selected':''}>${escapeHtml(t.name)}</option>`).join('');
+    m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">🏀</div><h3>De quin equip ets?</h3><p class="st-empty">Els punts d’assistència també compten per a la classificació d’afició dels equips del club.</p><select id="attTeamSel" style="width:100%;padding:12px;font-size:1rem;margin:10px 0"><option value="">— Tria el teu equip —</option>${opts}</select><div class="tour-nav"><button class="secondary" data-close="1">Cancel·lar</button><button class="primary" id="attTeamOk">Continuar</button></div></div>`;
+    m._stop=()=>resolve(null);
+    $('attTeamOk').onclick=()=>{ const v=$('attTeamSel').value; if(!v){ alert('Cal triar un equip.'); return; } try{ localStorage.setItem('attTeam',v); }catch{} m._stop=null; resolve(Number(v)); };
+  });
+}
+function redeemPending(){ const t=sessionStorage.getItem('pendingAtt'); if(!t) return; sessionStorage.removeItem('pendingAtt'); pickAttTeam().then(tid=>{ if(!tid) return closeAtt(); return redeemToken(t,tid).then(showAttResult); }); }
 async function openScanner(){
+  const tid=await pickAttTeam(); if(!tid){ closeAtt(); return; }
   const m=attModal();
   m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><h3>Escaneja el QR</h3><p class="st-empty" id="scanMsg">Apunta la càmera al QR que hi ha a la taula del partit.</p><div class="scan-box"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div></div><p class="st-empty">També pots escanejar-lo amb la càmera normal del mòbil.</p></div>`;
   const msg=t=>{ const e=$('scanMsg'); if(e) e.textContent=t; };
@@ -825,7 +851,7 @@ async function openScanner(){
     if(v.videoWidth){ const k=Math.min(1,640/v.videoWidth); c.width=Math.round(v.videoWidth*k); c.height=Math.round(v.videoHeight*k); x.drawImage(v,0,0,c.width,c.height);
       const q=jsQR(x.getImageData(0,0,c.width,c.height).data,c.width,c.height,{inversionAttempts:'dontInvert'});
       if(q&&q.data){ const t=(q.data.match(/att=([\w.-]+)/)||q.data.match(/^(\d+\.\d+\.[0-9a-f]{16})$/)||[])[1];
-        if(t){ alive=false; m._stop(); msg('Comprovant…'); redeemToken(t).then(showAttResult); return; } msg('Aquest QR no és de cap partit del club.'); } }
+        if(t){ alive=false; m._stop(); msg('Comprovant…'); redeemToken(t,tid).then(showAttResult); return; } msg('Aquest QR no és de cap partit del club.'); } }
     requestAnimationFrame(tick);
   })();
 }
@@ -979,7 +1005,7 @@ function initPush(){
   }catch(e){ console.warn('push',e); }
 }
 
-const APP_VERSION=51; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=53; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
