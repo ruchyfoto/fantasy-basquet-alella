@@ -207,6 +207,7 @@ function renderClubs(){
     const players=state.players.filter(p=>String(p.real_team_id)===String(t.id)).sort((a,b)=>Number(a.shirt_number||999)-Number(b.shirt_number||999));
     return `<article class="club-card"><div class="club-short">${escapeHtml(t.short_name||'')}</div><h3>${escapeHtml(t.name)}</h3>
     <div class="club-stats"><div><small>Partits guanyats</small><b>${g}/${pj}</b><div class="st-bar"><i style="width:${pj?Math.round(100*g/pj):0}%"></i></div></div><div><small>Popularitat</small><b>${pop===null?'—':pop+'%'}</b><div class="st-bar"><i style="width:${pop||0}%"></i></div></div></div>
+    ${(()=>{ const a=(state.attRank||{})[String(t.id)]; if(!a) return ''; const n=Object.keys(state.attRank).length; return a.scans>0?`<div class="club-att" style="margin:8px 0 2px;font-size:.92rem">🏟️ Afició: <b>${a.pos}${a.pos===1?'r':a.pos===2?'n':a.pos===3?'r':a.pos===4?'t':'è'}</b> de ${n} · ${a.scans} ${a.scans===1?'partit':'partits'}</div>`:`<div class="club-att" style="margin:8px 0 2px;font-size:.92rem">🏟️ Afició: <b>—</b> · encara cap partit</div>`; })()}
     <div class="club-sec">🧑‍🏫 Entrenadors</div><div class="chips">${coaches.map(o=>chip(`data-cid="${o.c.id}" data-ctid="${o.tid}"`,cph(o.c),'🧑‍🏫',coachName(o.c),'Entrenador')).join('')||'<small>Sense entrenadors</small>'}</div>
     <div class="club-sec">🏀 Jugadors (${players.length})</div><div class="chips">${players.map(p=>chip(`data-pid="${p.id}"`,p.photo_url||'logo.png','👤',`${p.name} ${p.surname||''}`.trim(),'#'+String(p.shirt_number??'—').replace(/\.0$/,''))).join('')||'<small>Sense jugadors</small>'}</div></article>`;
   }).join('');
@@ -227,6 +228,8 @@ async function renderTeamAtt(){
   try{
     const r=await rpc('get_attendance_team_ranking',{}); const t=await r.text(); if(!r.ok) throw new Error(t.slice(0,140));
     const rows=JSON.parse(t||'[]'), max=Math.max(1,...rows.map(x=>Number(x.scans)));
+    state.attRank=Object.fromEntries(rows.map(x=>[String(x.real_team_id),{scans:Number(x.scans),pos:1+rows.filter(y=>Number(y.scans)>Number(x.scans)).length}]));
+    try{ renderClubs(); }catch{}
     box.innerHTML=rows.some(x=>Number(x.scans)>0)?rows.map((x,i)=>`<div class="ranking-row${i<3&&Number(x.scans)>0?' top'+(i+1):''}" style="--i:${i}"><span class="ranking-pos">${Number(x.scans)>0?(['🥇','🥈','🥉'][i]||i+1):'·'}</span><div class="ranking-name"><b>${escapeHtml(x.team_name)}</b><small>${x.people} ${Number(x.people)===1?'persona':'persones'}${Number(x.players)?` · ${(Number(x.scans)/Number(x.players)).toFixed(1).replace('.',',')} per jugador`:''}</small></div><strong>${x.scans} ${Number(x.scans)===1?'partit':'partits'}</strong></div>`).join(''):'<div class="empty-state">Encara no hi ha cap assistència registrada. Escaneja el QR d’un partit!</div>';
   }catch(e){ box.innerHTML=`<div class="empty-state">No s’ha pogut carregar l’afició per equips.<br><small>${escapeHtml(e.message)}</small></div>`; }
 }
@@ -1005,7 +1008,7 @@ function initPush(){
   }catch(e){ console.warn('push',e); }
 }
 
-const APP_VERSION=54; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=55; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
