@@ -861,7 +861,7 @@ async function loadAttStats(){
   el.textContent=n?`Has registrat ${n} ${n===1?'partit':'partits'} · +${s} punts`:'';
 }
 let _isClub=null;
-async function isClubAccount(){ if(_isClub!==null) return _isClub; try{ const r=await api('club_accounts?select=user_id'); _isClub=r.ok?((await r.json()).length>0):false; }catch{ _isClub=false; } return _isClub; }
+async function isClubAccount(){ if(_isClub!==null) return _isClub; try{ const me=state.session?.user?.id; if(!me){ return false; } const r=await api(`club_accounts?user_id=eq.${encodeURIComponent(me)}&select=user_id`); _isClub=r.ok?((await r.json()).length>0):false; }catch{ _isClub=false; } return _isClub; }
 async function loadTableDuty(){
   const me=state.session?.user?.id; if(!me||!$('tableTab')) return;
   const from=new Date(Date.now()-864e5).toISOString().slice(0,10);
@@ -1005,7 +1005,7 @@ function initPush(){
   }catch(e){ console.warn('push',e); }
 }
 
-const APP_VERSION=53; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=54; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
