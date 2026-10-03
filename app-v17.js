@@ -163,7 +163,7 @@ async function loadExtras(){
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
-  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce(); loadTableDuty(); loadAttStats();
+  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce(); loadTableDuty(); loadAttStats(); loadHomeMatches();
 }
 (function(){
   const court=$('teamPlayers'); if(!court) return; let d=null;
@@ -620,7 +620,7 @@ const TOUR=[
  {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
  {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada divendres a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
- {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
+ {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs els <b>partits a casa d’aquesta jornada</b>, amb l’hora i l’equip.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
  {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar el <b>jugador destacat</b> del teu equip (+5 punts).</p>`},
  {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el divendres a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
 ];
@@ -819,9 +819,9 @@ async function loadAttStats(){
 async function loadTableDuty(){
   const me=state.session?.user?.id; if(!me||!$('tableTab')) return;
   const from=new Date(Date.now()-864e5).toISOString().slice(0,10);
-  const [a,b]=await Promise.all([api(`match_tables?select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
+  const [a,b]=await Promise.all([api(`match_tables?user_id=eq.${me}&select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
   const rows=a.ok?await a.json():[], isP=b.ok&&(await b.json()).length>0;
-  state.myMatches=rows.map(r=>r.club_matches).sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
+  state.myMatches=[...new Map(rows.map(r=>r.club_matches).filter(Boolean).map(m=>[m.id,m])).values()].sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
   $('tableTab').style.display=(state.myMatches.length||isP)?'':'none';
   $('tableList').innerHTML=state.myMatches.map(m=>`<div class="mg-row"><b style="flex:1 1 200px">${escapeHtml(fmtMatch(m))}<br><small>🏀 ${escapeHtml(teamName(m.real_team_id))}${m.rival?' vs '+escapeHtml(m.rival):''}</small></b><button class="primary" data-qr="${m.id}">Mostrar QR</button></div>`).join('')||'<p>De moment no tens cap partit assignat aquest cap de setmana.</p>';
 }
@@ -852,11 +852,39 @@ async function loadWeek(){
 }
 if($('wkDate')){
   $('wkDate').value=nextSaturday(); $('wkDate').addEventListener('change',loadWeek);
-  $('wkAdd').onclick=async()=>{ const t=$('wkTime').value; if(!t||!$('wkTeam').value) return alert('Cal indicar l’hora i l’equip.'); if(await adminRpc('admin_save_match',{p_id:null,p_date:$('wkDate').value,p_time:t,p_team:Number($('wkTeam').value),p_rival:$('wkRival').value})){ $('wkRival').value=''; setAdminMessage('✅ Partit afegit.'); loadWeek(); } };
+  $('wkAdd').onclick=async()=>{ const t=$('wkTime').value; if(!t||!$('wkTeam').value) return alert('Cal indicar l’hora i l’equip.'); if(await adminRpc('admin_save_match',{p_id:null,p_date:$('wkDate').value,p_time:t,p_team:Number($('wkTeam').value),p_rival:$('wkRival').value})){ $('wkRival').value=''; setAdminMessage('✅ Partit afegit.'); loadWeek(); loadHomeMatches(); } };
   $('wkList').addEventListener('click',async e=>{ const b=e.target.closest('[data-wk]'); if(!b) return; const row=b.closest('.mg-row'), id=Number(row.dataset.mid);
-    if(b.dataset.wk==='del'){ if(confirm('Eliminar aquest partit i les seves taules?')&&await adminRpc('admin_delete_match',{p_id:id})){ loadWeek(); } }
+    if(b.dataset.wk==='del'){ if(confirm('Eliminar aquest partit i les seves taules?')&&await adminRpc('admin_delete_match',{p_id:id})){ loadWeek(); loadHomeMatches(); } }
     else{ const ids=[...new Set([row.querySelector('.wk-t1').value,row.querySelector('.wk-t2').value].filter(Boolean))]; if(await adminRpc('admin_set_match_tables',{p_match_id:id,p_user_ids:ids})){ alert('✅ Taules desades.'); loadWeek(); } } });
 }
+
+/* ===== PARTITS A CASA D'AQUESTA JORNADA (INICI) ===== */
+const madridToday=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Madrid'});
+function weekRange(){
+  const d=new Date(madridToday()+'T12:00:00Z'), dow=(d.getUTCDay()+6)%7;
+  const mon=new Date(d); mon.setUTCDate(d.getUTCDate()-dow); const sun=new Date(mon); sun.setUTCDate(mon.getUTCDate()+6);
+  return [mon.toISOString().slice(0,10),sun.toISOString().slice(0,10)];
+}
+async function loadHomeMatches(){
+  if(!$('homeMatches')) return; const [a,b]=weekRange();
+  const r=await api(`club_matches?match_date=gte.${a}&match_date=lte.${b}&order=match_date,start_time&select=id,match_date,start_time,real_team_id,rival`);
+  state.homeMatches=r.ok?await r.json():null; renderHomeMatches();
+}
+function renderHomeMatches(){
+  const box=$('homeMatches'); if(!box||state.homeMatches===undefined) return;
+  if(state.homeMatches===null){ box.innerHTML='<p class="st-empty">No s’han pogut carregar els partits.</p>'; return; }
+  if(!state.homeMatches.length){ box.innerHTML='<p class="st-empty">Encara no hi ha partits publicats per aquesta jornada. Torna-hi després de la reunió de dilluns!</p>'; return; }
+  const now=Date.now(), today=madridToday(), days=[...new Set(state.homeMatches.map(m=>m.match_date))];
+  box.innerHTML=days.map(d=>{
+    const ms=state.homeMatches.filter(m=>m.match_date===d);
+    const title=new Date(d+'T12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'});
+    return `<div class="hm-day${d===today?' today':''}"><b>${escapeHtml(title)}</b>${d===today?'<span class="hm-badge">Avui</span>':''}</div>`+ms.map(m=>{
+      const st=new Date(`${m.match_date}T${m.start_time}`).getTime(), live=now>=st&&now<st+72e5, done=now>=st+72e5;
+      return `<div class="hm-row${done?' done':''}"><span class="hm-time">${String(m.start_time).slice(0,5)}</span><span class="hm-match"><b>${escapeHtml(teamName(m.real_team_id))}</b>${m.rival?' <small>vs '+escapeHtml(m.rival)+'</small>':''}</span>${live?'<span class="hm-badge live">🔴 En joc</span>':done?'<span class="hm-badge off">Acabat</span>':''}</div>`;
+    }).join('');
+  }).join('');
+}
+setInterval(renderHomeMatches,60000);
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
