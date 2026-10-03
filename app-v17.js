@@ -378,7 +378,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadReferral(); redeemRef(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -660,6 +660,7 @@ const TOUR=[
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
  {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs el <b>calendari d’aquesta jornada</b>: tots els partits, a casa (🏠) i a fora (✈️), amb l’hora i l’estat. El QR només hi és als partits a casa. Els marcats amb <b>⭐ x2</b> donen el doble de punts.</li><li>Si vas a veure partits <b>setmanes seguides</b>, tens bonus: <b>+2</b> a la 3a setmana i <b>+5</b> a la 5a.</li><li>Completa les <b>missions</b> i convida amics amb el teu <b>codi</b> per sumar punts extra.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
  {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar els <b>3 jugadors destacats</b> del teu equip per ordre d’importància (+7, +5 i +3 punts).</p>`},
+ {i:'🔮',t:'Pronòstics',go:'home',h:`<p>Cada jornada, a l’<b>Inici</b>, pots pronosticar fins a <b>5 equips</b> del club: <b>guanyaran o perdran</b>.</p><ul><li><b>+2 punts</b> per cada encert.</li><li><b>+3 extra</b> si els encertes tots (mínim 3 pronòstics).</li><li>Es tanquen amb el mercat, dijous a les 23:59. Quan es tanquen, veuràs què pensen els altres usuaris.</li></ul>`},
  {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el dijous a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
 ];
 function openTour(start=0){
@@ -749,6 +750,8 @@ const TIPS=[
 "c|El mercat és tancat: aprofita per revisar la plantilla i planificar els pròxims fitxatges.",
 "o|Vigila el compte enrere de dalt de tot: marca quan tanca el mercat.",
 "El mercat no es reobre fins que comença la jornada següent.",
+"Pronostica fins a 5 equips cada jornada: +2 per encert i +3 si els encertes tots!",
+"Quan es tanquen els pronòstics, podràs veure quin percentatge d’usuaris creu que guanyarà cada equip.",
 "Anar a veure partits setmanes seguides dona bonus: +2 a la 3a setmana i +5 a la 5a!",
 "Mira les missions de l’Inici: són punts fàcils cada setmana.",
 "Convida un amic amb el teu codi: tots dos sumeu +5 punts.",
@@ -1078,7 +1081,43 @@ async function redeemRef(){
   }catch(e){}
 }
 
-const APP_VERSION=58; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+
+/* ===== PRONÒSTICS ===== */
+async function loadPredictions(){
+  const box=$('predBox'); if(!box) return;
+  try{
+    const r=await rpc('get_predictions',{}), t=await r.text(); if(!r.ok) throw new Error(t.slice(0,140));
+    state.pred=JSON.parse(t); renderPredictions();
+  }catch(e){ box.innerHTML=`<p class="st-empty">No s’han pogut carregar els pronòstics.<br><small>${escapeHtml(e.message||'')}</small></p>`; }
+}
+function renderPredictions(){
+  const d=state.pred, box=$('predBox'); if(!d||!box) return;
+  const when=d.closes_at?fmtData(new Date(d.closes_at)):'quan tanqui el mercat';
+  $('predSub').innerHTML=d.closed?'🔒 Pronòstics tancats · es compten quan es processa la jornada':`⏳ Es tanquen ${escapeHtml(when)} (amb el mercat)`;
+  if(!d.teams.length){ box.innerHTML='<p class="st-empty">Encara no hi ha equips per pronosticar aquesta jornada.</p>'; return; }
+  const vs=m=>m?`${ymdDate(m.date,'12:00').toLocaleDateString('ca-ES',{weekday:'short',day:'numeric'})} · ${String(m.time).slice(0,5)} · ${m.venue==='away'?'✈️ fora':'🏠 casa'}${m.rival?(m.venue==='away'?' @ ':' vs ')+escapeHtml(m.rival):''}`:'';
+  box.innerHTML=`<p class="st-empty" style="margin:-4px 0 8px">Pronòstics: <b>${d.count}/${d.max}</b> · +2 per encert, +3 extra si els encertes tots (mínim 3).</p>`+d.teams.map(t=>{
+    const res=t.result&&t.pick?(t.result===t.pick?'<span class="hm-badge" style="background:#2f855a">✅ Encert</span>':'<span class="hm-badge" style="background:#9b2c2c">❌ Fallat</span>'):'';
+    let ctl='';
+    if(!d.closed){
+      ctl=`<div class="pr-btns"><button class="pr-b${t.pick==='win'?' on':''}" data-pr-team="${t.team_id}" data-pr-pick="win">✅ Guanya</button><button class="pr-b${t.pick==='loss'?' on loss':''}" data-pr-team="${t.team_id}" data-pr-pick="loss">❌ Perd</button></div>`;
+    } else {
+      const tot=Number(t.total||0), pw=tot?Math.round(100*Number(t.wins||0)/tot):null;
+      ctl=`<div class="pr-closed">${t.pick?`El teu pronòstic: <b>${t.pick==='win'?'✅ Guanya':'❌ Perd'}</b> ${res}`:'<small>No has pronosticat aquest equip</small>'}${pw===null?'<br><small>Ningú l’ha pronosticat</small>':`<div class="st-bar"><i style="width:${pw}%"></i></div><small>${pw}% creu que guanyarà · ${100-pw}% que perdrà (${tot} ${tot===1?'pronòstic':'pronòstics'})</small>`}</div>`;
+    }
+    return `<div class="pr-row"><div class="pr-t"><b>${escapeHtml(t.name)}</b><small>${vs(t.match)}</small></div>${ctl}</div>`;
+  }).join('');
+}
+if($('predBox')) $('predBox').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-pr-team]'); if(!b) return;
+  const team=Number(b.dataset.prTeam), pick=b.dataset.prPick, cur=(state.pred?.teams||[]).find(x=>x.team_id===team)?.pick;
+  try{ const r=await rpc('save_prediction',{p_team:team,p_pick:cur===pick?null:pick}), t=await r.text(); if(!r.ok){ let m=t; try{m=JSON.parse(t).message||t;}catch{} throw new Error(m); } }
+  catch(err){ alert('⚠️ '+err.message); }
+  loadPredictions();
+});
+setInterval(()=>{ if(document.visibilityState==='visible') loadPredictions(); },300000);
+
+const APP_VERSION=59; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
