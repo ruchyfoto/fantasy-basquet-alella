@@ -51,6 +51,7 @@ async function signup(){
   if(password!==passwordConfirm) return setAuthMessage('Les contrasenyes no coincideixen.');
   try{
     setAuthMessage('Creant el compte…');
+    try{ const rc=($('signupRef')?.value||'').trim().toUpperCase(); if(rc) localStorage.setItem('refCode',rc); }catch{}
     const data=await authRequest('signup',{email,password,data:{username}});
     if(!data.access_token){
       setAuthMessage('Compte creat. Revisa el correu per confirmar-lo i després inicia sessió.',true);
@@ -377,7 +378,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadReferral(); redeemRef(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -657,7 +658,7 @@ const TOUR=[
  {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
  {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Màxim <b>1 jugador de cada equip real</b>, amb una excepció: <b>a partir del 5 d’octubre pots tenir-ne 2 del mateix equip</b>, però només d’un equip.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
- {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs els <b>partits a casa d’aquesta jornada</b>, amb l’hora i l’equip.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
+ {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs els <b>partits a casa d’aquesta jornada</b>, amb l’hora i l’equip. Els marcats amb <b>⭐ x2</b> donen el doble de punts.</li><li>Si vas a veure partits <b>setmanes seguides</b>, tens bonus: <b>+2</b> a la 3a setmana i <b>+5</b> a la 5a.</li><li>Completa les <b>missions</b> i convida amics amb el teu <b>codi</b> per sumar punts extra.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
  {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar els <b>3 jugadors destacats</b> del teu equip per ordre d’importància (+7, +5 i +3 punts).</p>`},
  {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el dijous a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
 ];
@@ -748,6 +749,10 @@ const TIPS=[
 "c|El mercat és tancat: aprofita per revisar la plantilla i planificar els pròxims fitxatges.",
 "o|Vigila el compte enrere de dalt de tot: marca quan tanca el mercat.",
 "El mercat no es reobre fins que comença la jornada següent.",
+"Anar a veure partits setmanes seguides dona bonus: +2 a la 3a setmana i +5 a la 5a!",
+"Mira les missions de l’Inici: són punts fàcils cada setmana.",
+"Convida un amic amb el teu codi: tots dos sumeu +5 punts.",
+"Quan un partit surt marcat amb ⭐ x2, els punts d’assistència valen el doble.",
 "Amb el mercat tancat tampoc es pot vendre ni canviar de capità.",
 "Cada victòria suma punts: 12 la primera, 13 la segona seguida, 14 la tercera…",
 "La ratxa és or: cada victòria seguida d’un jugador suma 1 punt més.",
@@ -822,7 +827,7 @@ async function redeemToken(token,teamId){
 function showAttResult(res){
   const m=attModal(); if(m._stop){ m._stop(); m._stop=null; }
   m.innerHTML=res.ok
-   ?`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">✅</div><h3>S’ha escanejat correctament!</h3><p style="text-align:center;font-size:1.1rem"><b>+${res.points||3} punts</b> per al teu equip</p>${res.team?`<p style="text-align:center">🏀 ${escapeHtml(res.team)}${res.rival?' vs '+escapeHtml(res.rival):''}</p>`:''}<div class="tour-nav"><button class="primary" data-close="1" style="margin:auto">Perfecte!</button></div></div>`
+   ?`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">✅</div><h3>S’ha escanejat correctament!</h3><p style="text-align:center;font-size:1.1rem"><b>+${res.points||3} punts</b> per al teu equip${res.double?' <b>⭐ (partit x2!)</b>':''}</p>${res.bonus?`<p style="text-align:center">🔥 Ratxa de ${res.streak} setmanes: <b>+${res.bonus} punts extra</b></p>`:(res.streak>=2?`<p style="text-align:center">🔥 Portes ${res.streak} setmanes seguides veient partits</p>`:'')}${res.team?`<p style="text-align:center">🏀 ${escapeHtml(res.team)}${res.rival?' vs '+escapeHtml(res.rival):''}</p>`:''}<div class="tour-nav"><button class="primary" data-close="1" style="margin:auto">Perfecte!</button></div></div>`
    :`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">⚠️</div><h3>No s’ha pogut registrar</h3><p style="text-align:center">${escapeHtml(res.msg||'Error desconegut.')}</p><div class="tour-nav"><button class="secondary" data-close="1">Tancar</button><button class="primary" id="scanAgain">Tornar a provar</button></div></div>`;
   if(res.ok){ confetti(); loadData(); } else { const b=$('scanAgain'); if(b) b.onclick=openScanner; }
 }
@@ -869,7 +874,7 @@ async function loadTableDuty(){
   const me=state.session?.user?.id; if(!me||!$('tableTab')) return;
   const from=new Date(Date.now()-864e5).toISOString().slice(0,10);
   const club=await isClubAccount();
-  const [a,b]=await Promise.all([club?api(`club_matches?match_date=gte.${from}&select=id,match_date,start_time,real_team_id,rival`):api(`match_tables?user_id=eq.${me}&select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
+  const [a,b]=await Promise.all([club?api(`club_matches?match_date=gte.${from}&select=id,match_date,start_time,real_team_id,rival,double_points`):api(`match_tables?user_id=eq.${me}&select=match_id,club_matches!inner(id,match_date,start_time,real_team_id,rival)&club_matches.match_date=gte.${from}`),api(`table_people?user_id=eq.${me}&select=user_id`)]);
   const rows=a.ok?await a.json():[], isP=club||(b.ok&&(await b.json()).length>0);
   state.myMatches=[...new Map((club?rows:rows.map(r=>r.club_matches)).filter(Boolean).map(m=>[m.id,m])).values()].sort((p,q)=>(p.match_date+p.start_time).localeCompare(q.match_date+q.start_time));
   $('tableTab').style.display=(state.myMatches.length||isP)?'':'none';
@@ -898,11 +903,12 @@ async function loadWeek(){
   const us=state.adminUsers||[], pool=us.filter(u=>u.is_table).length?us.filter(u=>u.is_table):us;
   const opt=sel=>'<option value="">— Ningú —</option>'+pool.map(u=>`<option value="${u.user_id}"${u.user_id===sel?' selected':''}>${escapeHtml(u.username||u.email)}</option>`).join('');
   $('wkTeam').innerHTML=state.teams.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
-  $('wkList').innerHTML=ms.map(m=>{ const u=tb.filter(x=>x.match_id===m.id).map(x=>x.user_id); return `<div class="mg-row" data-mid="${m.id}"><b style="flex:1 1 170px">${String(m.start_time).slice(0,5)} · ${escapeHtml(teamName(m.real_team_id))} vs ${escapeHtml(m.rival||'—')}</b><select class="wk-t1">${opt(u[0])}</select><select class="wk-t2">${opt(u[1])}</select><button class="primary" data-wk="save">Desar taules</button><button class="secondary danger" data-wk="del">Eliminar</button><small>👀 ${at.filter(x=>x.match_id===m.id).length}</small></div>`; }).join('')||'<small>Encara no hi ha partits aquest dia.</small>';
+  $('wkList').innerHTML=ms.map(m=>{ const u=tb.filter(x=>x.match_id===m.id).map(x=>x.user_id); return `<div class="mg-row" data-mid="${m.id}"><b style="flex:1 1 170px">${String(m.start_time).slice(0,5)} · ${escapeHtml(teamName(m.real_team_id))} vs ${escapeHtml(m.rival||'—')}</b><select class="wk-t1">${opt(u[0])}</select><select class="wk-t2">${opt(u[1])}</select><button class="primary" data-wk="save">Desar taules</button><button class="secondary danger" data-wk="del">Eliminar</button><label style="white-space:nowrap"><input type="checkbox" class="wk-x2" ${m.double_points?'checked':''}> ⭐ x2</label><small>👀 ${at.filter(x=>x.match_id===m.id).length}</small></div>`; }).join('')||'<small>Encara no hi ha partits aquest dia.</small>';
 }
 if($('wkDate')){
   $('wkDate').value=nextSaturday(); $('wkDate').addEventListener('change',loadWeek);
   $('wkAdd').onclick=async()=>{ const t=$('wkTime').value; if(!t||!$('wkTeam').value) return alert('Cal indicar l’hora i l’equip.'); if(await adminRpc('admin_save_match',{p_id:null,p_date:$('wkDate').value,p_time:t,p_team:Number($('wkTeam').value),p_rival:$('wkRival').value})){ $('wkRival').value=''; setAdminMessage('✅ Partit afegit.'); loadWeek(); loadHomeMatches(); } };
+  $('wkList').addEventListener('change',async e=>{ const c=e.target.closest('.wk-x2'); if(!c) return; const id=Number(c.closest('.mg-row').dataset.mid); if(!(await adminRpc('admin_set_match_double',{p_id:id,p_on:c.checked}))){ c.checked=!c.checked; } else { loadHomeMatches(); } });
   $('wkList').addEventListener('click',async e=>{ const b=e.target.closest('[data-wk]'); if(!b) return; const row=b.closest('.mg-row'), id=Number(row.dataset.mid);
     if(b.dataset.wk==='del'){ if(confirm('Eliminar aquest partit i les seves taules?')&&await adminRpc('admin_delete_match',{p_id:id})){ loadWeek(); loadHomeMatches(); } }
     else{ const ids=[...new Set([row.querySelector('.wk-t1').value,row.querySelector('.wk-t2').value].filter(Boolean))]; if(await adminRpc('admin_set_match_tables',{p_match_id:id,p_user_ids:ids})){ alert('✅ Taules desades.'); loadWeek(); } } });
@@ -935,7 +941,7 @@ function renderHomeMatches(){
     const title=ymdDate(d,'12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'});
     return `<div class="hm-day${d===today?' today':''}"><b>${escapeHtml(title)}</b>${d===today?'<span class="hm-badge">Avui</span>':''}</div>`+ms.map(m=>{
       const st=ymdDate(m.match_date,m.start_time).getTime(), live=now>=st&&now<st+72e5, done=now>=st+72e5;
-      return `<div class="hm-row${done?' done':''}"><span class="hm-time">${String(m.start_time).slice(0,5)}</span><span class="hm-match"><b>${escapeHtml(teamName(m.real_team_id))}</b>${m.rival?' <small>vs '+escapeHtml(m.rival)+'</small>':''}</span>${live?'<span class="hm-badge live">🔴 En joc</span>':done?'<span class="hm-badge off">Acabat</span>':''}</div>`;
+      return `<div class="hm-row${done?' done':''}"><span class="hm-time">${String(m.start_time).slice(0,5)}</span><span class="hm-match"><b>${escapeHtml(teamName(m.real_team_id))}</b>${m.rival?' <small>vs '+escapeHtml(m.rival)+'</small>':''}</span>${m.double_points?'<span class="hm-badge" style="background:#f6a21a;color:#2a1a00">⭐ x2</span>':''}${live?'<span class="hm-badge live">🔴 En joc</span>':done?'<span class="hm-badge off">Acabat</span>':''}</div>`;
     }).join('');
   }).join('');
 }
@@ -1025,7 +1031,41 @@ window.addEventListener('appinstalled',()=>{ _installEv=null; renderInstall(); }
 document.addEventListener('click',async e=>{ if(e.target&&e.target.id==='installBtn'&&_installEv){ _installEv.prompt(); try{ await _installEv.userChoice; }catch{} _installEv=null; renderInstall(); } });
 
 
-const APP_VERSION=56; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+
+/* ===== MISSIONS, RATXA I CONVIDA UN AMIC ===== */
+async function loadMissions(){
+  const box=$('missionsBox'); if(!box) return;
+  try{
+    const r=await rpc('get_missions',{}), t=await r.text(); if(!r.ok) throw new Error(t.slice(0,140));
+    const d=JSON.parse(t), fm=x=>x.slice(8)+'/'+x.slice(5,7);
+    $('missionsSub').textContent=`Setmana del ${fm(d.week_start)} al ${fm(d.week_end)}`;
+    const streakTxt=d.streak>0?`<div class="mi-streak">🔥 Ratxa d’assistència: <b>${d.streak}</b> ${d.streak===1?'setmana':'setmanes'} seguides${d.streak_at_risk?' · <b>vés a veure un partit aquesta setmana per no perdre-la!</b>':''}<br><small>+2 punts a les 3 setmanes, +5 a les 5.</small></div>`:`<div class="mi-streak">🔥 Ratxa d’assistència: ves a veure partits setmanes seguides i suma <b>+2</b> (3 setmanes) i <b>+5</b> (5 setmanes).</div>`;
+    box.innerHTML=streakTxt+d.missions.map(m=>`<div class="mi-row${m.done?' done':''}"><span class="mi-ic">${m.done?'✅':'⬜'}</span><span class="mi-t">${escapeHtml(m.title)}${m.goal>1?` <small>(${m.prog}/${m.goal})</small>`:''}</span><b>+${m.pts}</b></div>`).join('')+`<small style="display:block;margin-top:6px">Punts extra guanyats en total: <b>${Number(d.bonus_total||0).toFixed(0)}</b></small>`;
+    if(state.bonusTotal!==undefined && state.bonusTotal!==d.bonus_total) renderRanking();
+    state.bonusTotal=d.bonus_total;
+  }catch(e){ box.innerHTML=`<p class="st-empty">No s’han pogut carregar les missions.<br><small>${escapeHtml(e.message||'')}</small></p>`; }
+}
+async function loadReferral(){
+  const box=$('refBox'); if(!box) return;
+  try{
+    const r=await rpc('get_my_referral',{}), t=await r.text(); if(!r.ok) throw new Error(t.slice(0,140));
+    const d=JSON.parse(t), link=`${location.origin}${location.pathname.replace(/index\.html$/,'')}#ref=${d.code}`;
+    box.innerHTML=`<p>Convida un amic: quan creï el compte amb el teu codi, <b>tots dos sumeu +5 punts</b>. Màxim ${d.max} amics.</p><div class="ref-code">${escapeHtml(d.code)}</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="primary" id="refShare">📤 Compartir</button><button class="secondary" id="refCopy">Copiar codi</button></div><small style="display:block;text-align:center;margin-top:8px">Amics apuntats: <b>${d.invited}/${d.max}</b> · +${Number(d.points||0).toFixed(0)} punts</small>`;
+    $('refShare').onclick=async()=>{ const text=`Uneix-te al Fantasy del Club Bàsquet Alella! Fes servir el meu codi ${d.code} i sumem 5 punts cadascú.`; try{ if(navigator.share) await navigator.share({title:'Fantasy Bàsquet Alella',text,url:link}); else { await navigator.clipboard.writeText(text+' '+link); alert('Enllaç copiat!'); } }catch{} };
+    $('refCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(d.code); alert('Codi copiat: '+d.code); }catch{ prompt('El teu codi:',d.code); } };
+  }catch(e){ box.innerHTML=`<p class="st-empty">No s’ha pogut carregar el codi d’amic.<br><small>${escapeHtml(e.message||'')}</small></p>`; }
+}
+(function(){ const m=location.hash.match(/ref=([A-Za-z0-9]{4,10})/); if(m){ try{ localStorage.setItem('refCode',m[1].toUpperCase()); }catch{} history.replaceState(null,'',location.pathname+location.search); } try{ const c=localStorage.getItem('refCode'); if(c&&$('signupRef')) $('signupRef').value=c; }catch{} })();
+async function redeemRef(){
+  let c=null; try{ c=localStorage.getItem('refCode'); }catch{} if(!c) return;
+  try{
+    const r=await rpc('redeem_referral',{p_code:c}), t=await r.text();
+    try{ localStorage.removeItem('refCode'); }catch{}
+    if(r.ok){ confetti(); alert('🤝 Codi d’amic aplicat: +5 punts per a tu i per al teu amic!'); loadMissions(); loadReferral(); renderRanking(); }
+  }catch(e){}
+}
+
+const APP_VERSION=57; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
