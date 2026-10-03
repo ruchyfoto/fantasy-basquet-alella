@@ -163,7 +163,7 @@ async function loadExtras(){
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
-  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce(); loadTableDuty(); loadAttStats(); loadHomeMatches();
+  state.lineup=Array.isArray(lay)?lay:[]; renderTeam(); renderMarket(); renderClubs(); loadAnnounce(); loadTableDuty(); loadAttStats();
 }
 (function(){
   const court=$('teamPlayers'); if(!court) return; let d=null;
@@ -225,6 +225,7 @@ async function renderRanking(){
     box.innerHTML=rows.length?rows.map((x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`).join(''):'<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
   }catch(e){box.innerHTML=`<div class="empty-state">No s'ha pogut carregar la classificació.<br><small>${escapeHtml(e.message)}</small></div>`;}
 }
+const HL_PTS=[7,5,3], HL_MEDAL=['🥇','🥈','🥉'];
 function renderCoachPanel(){
   const section=$('coachPanel');
   if(!section)return;
@@ -233,18 +234,31 @@ function renderCoachPanel(){
     return;
   }
   section.style.display='';
-  $('coachPanelSubtitle').textContent=`Hola ${state.coachContext[0].coach_name}. Selecciona el jugador destacat de cada equip després que s’hagi registrat el resultat.`;
+  state.hlSel=state.hlSel||{};
+  $('coachPanelSubtitle').textContent=`Hola ${state.coachContext[0].coach_name}. Un cop registrat el resultat, tria fins a 3 jugadors destacats per ordre d’importància: el 1r suma +7 punts, el 2n +5 i el 3r +3.`;
   $('coachPanelGrid').innerHTML=state.coachContext.map(ctx=>{
-    const players=state.players.filter(p=>String(p.real_team_id)===String(ctx.real_team_id));
-    const selected=ctx.highlighted_player_id;
+    const tid=String(ctx.real_team_id);
+    if(!state.hlSel[tid]) state.hlSel[tid]=(ctx.highlighted_player_ids||[]).map(String);
+    const sel=state.hlSel[tid];
+    const players=state.players.filter(p=>String(p.real_team_id)===tid);
+    const saved=(ctx.highlighted_player_ids||[]).length;
     return `<article class="coach-team-panel card">
-      <div class="coach-team-header"><div><span class="coach-label">EQUIP</span><h3>${escapeHtml(ctx.real_team_name)}</h3><p>${ctx.result==='win'?'🟢 Victòria':ctx.result==='loss'?'🔴 Derrota':'⏳ Resultat pendent'} · Jornada ${ctx.round_number}</p></div><div class="pill">${selected?'⭐ Destacat seleccionat':'Sense destacat'}</div></div>
+      <div class="coach-team-header"><div><span class="coach-label">EQUIP</span><h3>${escapeHtml(ctx.real_team_name)}</h3><p>${ctx.result==='win'?'🟢 Victòria':ctx.result==='loss'?'🔴 Derrota':'⏳ Resultat pendent'} · Jornada ${ctx.round_number}</p></div><div class="pill">${saved?`⭐ ${saved} destacat${saved>1?'s':''} desat${saved>1?'s':''}`:'Sense destacats'}</div></div>
       ${ctx.result ? `<div class="coach-player-list">${players.map(p=>{
-        const isSelected=String(p.id)===String(selected);
-        return `<button class="coach-player-option${isSelected?' selected':''}" data-highlight-player="${p.id}" data-highlight-team="${ctx.real_team_id}"><span class="coach-player-main"><b>#${escapeHtml(String(p.shirt_number ?? '—').replace(/\.0$/,''))}</b><span>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</span></span><span>${isSelected?'⭐ Destacat':'Seleccionar'}</span></button>`;
-      }).join('')}</div>` : `<div class="notice">Quan l’administrador registri el resultat, podràs seleccionar el jugador destacat.</div>`}
+        const k=sel.indexOf(String(p.id));
+        return `<button class="coach-player-option${k>=0?' selected':''}" data-hl-pick="${p.id}" data-hl-team="${tid}"><span class="coach-player-main"><b>#${escapeHtml(String(p.shirt_number ?? '—').replace(/\.0$/,''))}</b><span>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</span></span><span>${k>=0?`${HL_MEDAL[k]} ${k+1}r · +${HL_PTS[k]}`:'Seleccionar'}</span></button>`;
+      }).join('')}</div>
+      <p class="muted" style="margin:.6rem 0 .3rem">Toca els jugadors per ordre: el primer que triïs és el més important. Torna a tocar-ne un per treure’l.</p>
+      <button class="primary" data-hl-save="${tid}" ${sel.length?'':'disabled'}>Desar destacats (${sel.length}/3)</button>` : `<div class="notice">Quan l’administrador registri el resultat, podràs seleccionar els jugadors destacats.</div>`}
     </article>`;
   }).join('');
+  document.querySelectorAll('[data-hl-pick]').forEach(b=>b.onclick=()=>{
+    const tid=b.dataset.hlTeam, id=b.dataset.hlPick, sel=state.hlSel[tid]||(state.hlSel[tid]=[]);
+    const k=sel.indexOf(id);
+    if(k>=0) sel.splice(k,1); else if(sel.length<3) sel.push(id); else { alert('Només pots triar 3 jugadors. Treu-ne un primer.'); return; }
+    renderCoachPanel();
+  });
+  document.querySelectorAll('[data-hl-save]').forEach(b=>b.onclick=()=>saveHighlights(b.dataset.hlSave));
 }
 
 function renderRules(){ $('budgetRule').textContent='💰 120 M€'; }
@@ -255,22 +269,23 @@ function bindActions(){
   document.querySelectorAll('[data-sell-player]').forEach(b=>b.onclick=()=>sellPlayer(Number(b.dataset.sellPlayer)));
   document.querySelectorAll('[data-buy-coach]').forEach(b=>b.onclick=()=>buyCoach(Number(b.dataset.buyCoach),Number(b.dataset.buyCoachTeam)));
   document.querySelectorAll('[data-sell-coach]').forEach(b=>b.onclick=()=>sellCoach(Number(b.dataset.sellCoach),Number(b.dataset.sellCoachTeam)));
-  document.querySelectorAll('[data-highlight-player]').forEach(b=>b.onclick=()=>setHighlight(Number(b.dataset.highlightPlayer),Number(b.dataset.highlightTeam)));
 }
 async function buyPlayer(id){const p=state.players.find(x=>Number(x.id)===id);if(!p)return;if(!confirm(`Fitxar ${p.name} ${p.surname} per ${money(Number(p.current_value)*1.05)}?`))return;await runRpc('buy_fantasy_asset',{p_fantasy_team_id:state.teamId,p_player_id:id,p_coach_id:null,p_coach_real_team_id:null,p_round_id:state.round?.id||null},'Jugador fitxat correctament.');}
 async function buyCoach(id,teamId){const c=state.coaches.find(x=>Number(x.id)===id);if(!c)return;const market=state.coachMarkets.find(x=>Number(x.coach_id)===id&&Number(x.real_team_id)===teamId);const coachValue=Number(market?.current_value ?? c.current_value ?? 0);if(!confirm(`Fitxar ${coachName(c)} · ${teamName(teamId)} per ${money(coachValue*1.05)}?`))return;await runRpc('buy_fantasy_asset',{p_fantasy_team_id:state.teamId,p_player_id:null,p_coach_id:id,p_coach_real_team_id:teamId,p_round_id:state.round?.id||null},'Entrenador fitxat correctament.');}
 async function sellPlayer(id){if(!confirm('Vols vendre aquest jugador pel seu valor de mercat actual?'))return;await runRpc('sell_fantasy_asset',{p_fantasy_team_id:state.teamId,p_player_id:id,p_coach_id:null,p_coach_real_team_id:null,p_round_id:state.round?.id||null},'Jugador venut correctament.');}
 async function setCaptain(id){const p=state.players.find(x=>Number(x.id)===id);if(!p)return;if(state.rosterPlayers.find(x=>Number(x.player_id)===id)?.is_captain){return;}if(!confirm(`Fer ${p.name} ${p.surname||''} capità?`))return;await runRpc('set_fantasy_captain',{p_fantasy_team_id:state.teamId,p_player_id:id},'Capità actualitzat correctament.');}
 async function sellCoach(id,teamId){if(!confirm(`Vols vendre ${coachName(state.coaches.find(c=>Number(c.id)===id))} · ${teamName(teamId)}?`))return;await runRpc('sell_fantasy_asset',{p_fantasy_team_id:state.teamId,p_player_id:null,p_coach_id:id,p_coach_real_team_id:teamId,p_round_id:state.round?.id||null},'Entrenador venut correctament.');}
-async function setHighlight(playerId,teamId){
-  const p=state.players.find(x=>Number(x.id)===playerId);
-  if(!p)return;
-  if(!confirm(`Seleccionar ${p.name} ${p.surname||''} com a jugador destacat?`))return;
+async function saveHighlights(teamId){
+  const ids=(state.hlSel?.[String(teamId)]||[]).map(Number);
+  if(!ids.length) return;
+  const names=ids.map((id,k)=>{ const p=state.players.find(x=>Number(x.id)===id); return `${HL_MEDAL[k]} ${p?p.name+' '+(p.surname||''):id} (+${HL_PTS[k]})`; }).join('\n');
+  if(!confirm(`Desar aquests destacats?\n\n${names}`)) return;
   try{
-    const r=await rpc('set_team_round_highlight',{p_real_team_id:teamId,p_player_id:playerId});
+    const r=await rpc('set_team_round_highlights',{p_real_team_id:Number(teamId),p_player_ids:ids});
     const text=await r.text();
     if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
-    alert('✅ Jugador destacat guardat.');
+    alert('✅ Destacats guardats.');
+    delete state.hlSel[String(teamId)];
     await loadData();
     showSection('coachPanel');
   }catch(e){alert(`⚠️ ${e.message}`);}
@@ -302,13 +317,13 @@ async function loadCoachContext(){
     const [teamsR,resR,highR,coachR]=await Promise.all([
       api(`real_teams?id=in.(${idList})&select=id,name`),
       api(`team_round_results?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,result`),
-      api(`team_round_highlights?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,player_id`),
+      api(`team_round_highlights?round_id=eq.${round.id}&real_team_id=in.(${idList})&select=real_team_id,player_id,pos&order=pos`),
       api(`coaches?id=eq.${coachId}&select=name,surname&limit=1`)
     ]);
     for(const r of [teamsR,resR,highR,coachR]) if(!r.ok) throw new Error(await r.text());
     const teams=await teamsR.json(), results=await resR.json(), highlights=await highR.json(), coaches=await coachR.json();
     const resultByTeam=Object.fromEntries(results.map(x=>[String(x.real_team_id),x.result]));
-    const highlightByTeam=Object.fromEntries(highlights.map(x=>[String(x.real_team_id),x.player_id]));
+    const highlightByTeam={}; highlights.slice().sort((a,b)=>(a.pos||1)-(b.pos||1)).forEach(x=>{ (highlightByTeam[String(x.real_team_id)]=highlightByTeam[String(x.real_team_id)]||[]).push(x.player_id); });
     const teamById=Object.fromEntries(teams.map(x=>[String(x.id),x.name]));
     const coach=coaches[0];
     state.coachContext=ids.map(id=>({
@@ -317,7 +332,7 @@ async function loadCoachContext(){
       real_team_name:teamById[String(id)]||teamName(id),
       result:resultByTeam[String(id)]||null,
       round_number:round.round_number,
-      highlighted_player_id:highlightByTeam[String(id)]||null
+      highlighted_player_ids:highlightByTeam[String(id)]||[]
     }));
     const tab=document.querySelector('.coach-tab'); if(tab) tab.style.display='inline-flex';
   }catch(e){
@@ -341,7 +356,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadExtras(); maybeTour(); redeemPending();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -387,7 +402,7 @@ async function createNextRound(){
   const next=(state.round?.round_number||0)+1;
   try{
     const r=await rpc('admin_create_round',{p_pin:'1234',p_round_number:next}); const text=await r.text(); if(!r.ok)throw new Error(text.replace(/^"|"$/g,''));
-    await rpc('admin_set_market',{p_closes_at:nextFriday().toISOString(),p_manual_closed:false}); await loadData(); await loadAdminData(); setAdminMessage(`Jornada ${next} creada/activada. Mercat obert fins al proper divendres a les 23:59.`);
+    await rpc('admin_set_market',{p_closes_at:nextFriday().toISOString(),p_manual_closed:false}); await loadData(); await loadAdminData(); setAdminMessage(`Jornada ${next} creada/activada. Mercat obert fins al proper dijous a les 23:59.`);
   }catch(e){setAdminMessage(`Error: ${e.message}`);}
 }
 async function rollbackLastRound(){
@@ -505,7 +520,8 @@ if($('adminManage')){
 }
 
 /* ===== MERCAT: tancament setmanal ===== */
-function nextFriday(){ const d=new Date(); d.setHours(23,59,0,0); d.setDate(d.getDate()+((5-d.getDay()+7)%7)); if(d<=new Date()) d.setDate(d.getDate()+7); return d; }
+function nextFriday(){ return nextThursday(); }
+function nextThursday(){ const d=new Date(); d.setHours(23,59,0,0); d.setDate(d.getDate()+((4-d.getDay()+7)%7)); if(d<=new Date()) d.setDate(d.getDate()+7); return d; }
 function marketClosed(){ const m=state.market; return !!m&&!!(m.manual_closed||(m.closes_at&&new Date(m.closes_at)<=new Date())); }
 const fmtData=t=>t.toLocaleString('ca-ES',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
 async function loadMarket(){
@@ -529,7 +545,7 @@ function renderMarketBanner(){
   const el=$('marketBanner'); if(!el) return;
   const m=state.market, closed=marketClosed();
   document.body.classList.toggle('market-closed',closed);
-  if(closed){ el.className='market-banner closed'; el.innerHTML='<span class="lock">🔒</span> <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada divendres a les 23:59 perquè ningú faci moviments un cop coneguts els resultats reals.'; }
+  if(closed){ el.className='market-banner closed'; el.innerHTML='<span class="lock">🔒</span> <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada dijous a les 23:59 (el divendres hi ha partit) perquè ningú faci moviments un cop coneguts els resultats reals.'; }
   else if(m&&m.closes_at){ const t=new Date(m.closes_at), h=(t-new Date())/36e5; el.className='market-banner'+(h<24?' soon':''); el.innerHTML=`${h<24?'⏳':'🟢'} <b>Mercat obert</b> fins al ${fmtData(t)}.<br>⏱️ El mercat es tancarà en <b id="mkCount"></b>`; tickMarket(); }
   else { el.className='market-banner'; el.innerHTML='🟢 <b>Mercat obert.</b>'; }
 }
@@ -537,7 +553,7 @@ async function saveMarket(closesAt,manual,msg){ if(await adminRpc('admin_set_mar
 if($('marketSave')){
   $('marketSave').onclick=()=>{ const v=$('marketCloseAt').value; saveMarket(v?new Date(v).toISOString():null,false,'Tancament desat.'); };
   $('marketCloseNow').onclick=()=>{ if(confirm('Tancar el mercat ara mateix?')) saveMarket(state.market?.closes_at||null,true,'Mercat tancat.'); };
-  $('marketOpenNow').onclick=()=>{ if(confirm('Obrir el mercat fins al proper divendres a les 23:59?')) saveMarket(nextFriday().toISOString(),false,'Mercat obert.'); };
+  $('marketOpenNow').onclick=()=>{ if(confirm('Obrir el mercat fins al proper dijous a les 23:59?')) saveMarket(nextFriday().toISOString(),false,'Mercat obert.'); };
 }
 setInterval(tickMarket,1000);
 
@@ -618,11 +634,11 @@ const TOUR=[
  {i:'👕',t:'La teva plantilla',go:'team',h:`<p>És el teu equip: els <b>entrenadors a dalt</b> i els <b>8 jugadors</b> sobre la pista.</p><div class="tour-legend"><span class="demo">C</span><span>El <b>capità</b>: suma <b>+10 punts extra</b> al teu equip cada jornada que <b>guanya</b></span><span class="demo grey">☆ / ⭐</span><span>Fer capità aquest jugador</span><span class="demo grey">💸</span><span>Vendre’l: et retornen el valor actual, sense comissió</span><span class="demo grey">+</span><span>Lloc buit: et porta al mercat per fitxar-ne un</span></div><p>Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega.</p>`},
  {i:'📊',t:'Estadístiques',h:`<p>Toca qualsevol targeta de jugador o d’entrenador per obrir la seva fitxa:</p><ul><li>Punts totals, victòries, ratxa i valor.</li><li>Gràfica de l’<b>evolució del valor</b> i dels <b>punts per jornada</b>.</li><li>La <b>popularitat</b>: quants equips Fantasy el tenen.</li></ul><p>A <b>Equips</b> hi ha tots els integrants de cada equip real, amb els partits guanyats i la popularitat.</p>`},
  {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
- {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada divendres a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
+ {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Només <b>1 jugador de cada equip real</b>.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
  {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs els <b>partits a casa d’aquesta jornada</b>, amb l’hora i l’equip.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
- {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar el <b>jugador destacat</b> del teu equip (+5 punts).</p>`},
- {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el divendres a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
+ {i:'🧑‍🏫',t:'Ets entrenador?',h:`<p>Si ets entrenador del club, registra’t amb el teu correu habitual i l’administrador vincularà el teu compte. Veuràs una pestanya <b>Entrenador</b> on, després de cada partit, pots triar els <b>3 jugadors destacats</b> del teu equip per ordre d’importància (+7, +5 i +3 punts).</p>`},
+ {i:'🎉',t:'Tot a punt!',go:'market',h:`<p>Ja saps tot el que cal. Comença fitxant el teu equip des del <b>Mercat</b>, i recorda que tanca el dijous a les 23:59.</p><p>Pots tornar a veure aquesta guia quan vulguis amb el botó <span class="demo dark">❓ Guia</span> de dalt a la dreta, o des de la pestanya Regles.</p>`}
 ];
 function openTour(start=0){
   let i=start, m=$('tourModal');
@@ -671,11 +687,11 @@ $('openPrivacy').addEventListener('click',e=>{ e.preventDefault(); openPrivacy()
 
 async function checkRound(){
   if(!state.round) return null; const rid=state.round.id, el=$('adminChecklist');
-  const [rr,hh]=await Promise.all([api(`team_round_results?round_id=eq.${rid}&select=real_team_id,result`),api(`team_round_highlights?round_id=eq.${rid}&select=real_team_id`)]);
+  const [rr,hh]=await Promise.all([api(`team_round_results?round_id=eq.${rid}&select=real_team_id,result`),api(`team_round_highlights?round_id=eq.${rid}&select=real_team_id,pos`)]);
   const res=rr.ok?await rr.json():[], hl=hh.ok?await hh.json():[];
-  const withRes=new Set(res.filter(x=>x.result).map(x=>String(x.real_team_id))), withHl=new Set(hl.map(x=>String(x.real_team_id)));
+  const withRes=new Set(res.filter(x=>x.result).map(x=>String(x.real_team_id))), hlCount={}; hl.forEach(x=>{hlCount[String(x.real_team_id)]=(hlCount[String(x.real_team_id)]||0)+1;}); const withHl=new Set(Object.keys(hlCount).filter(k=>hlCount[k]>=3));
   const missRes=state.teams.filter(t=>!withRes.has(String(t.id))).map(t=>t.name), missHl=state.teams.filter(t=>withRes.has(String(t.id))&&!withHl.has(String(t.id))).map(t=>t.name);
-  if(el) el.innerHTML=`<div>${missRes.length?'⚠️':'✅'} Resultats: ${withRes.size}/${state.teams.length}${missRes.length?' · falten: '+escapeHtml(missRes.join(', ')):''}</div><div>${missHl.length?'⚠️':'✅'} Destacats (equips amb resultat): ${withRes.size-missHl.length}/${withRes.size}${missHl.length?' · falten: '+escapeHtml(missHl.join(', ')):''}</div>`;
+  if(el) el.innerHTML=`<div>${missRes.length?'⚠️':'✅'} Resultats: ${withRes.size}/${state.teams.length}${missRes.length?' · falten: '+escapeHtml(missRes.join(', ')):''}</div><div>${missHl.length?'⚠️':'✅'} Destacats complets (3 per equip amb resultat): ${withRes.size-missHl.length}/${withRes.size}${missHl.length?' · falten: '+escapeHtml(missHl.join(', ')):''}</div>`;
   return {missRes,missHl};
 }
 async function backupNow(){
@@ -707,14 +723,14 @@ const TIPS=[
 "Només pots tenir 1 jugador de cada equip real: diversifica!",
 "Comprar té una comissió del 5%; vendre no en té cap.",
 "Pots fer un màxim de 2 fitxatges per jornada (abans dels primers resultats, els que vulguis).",
-"o|El mercat tanca el divendres a les 23:59. No ho deixis per a l’últim minut!",
+"o|El mercat tanca el dijous a les 23:59. No ho deixis per a l’últim minut!",
 "c|El mercat és tancat: aprofita per revisar la plantilla i planificar els pròxims fitxatges.",
 "o|Vigila el compte enrere de dalt de tot: marca quan tanca el mercat.",
 "El mercat no es reobre fins que comença la jornada següent.",
 "Amb el mercat tancat tampoc es pot vendre ni canviar de capità.",
 "Cada victòria suma punts: 12 la primera, 13 la segona seguida, 14 la tercera…",
 "La ratxa és or: cada victòria seguida d’un jugador suma 1 punt més.",
-"Un jugador destacat suma +5 punts extra, encara que el seu equip perdi.",
+"L’entrenador tria 3 destacats per equip: el 1r suma +7 punts, el 2n +5 i el 3r +3, encara que l’equip perdi.",
 "El capità suma +10 punts extra a l’equip quan guanya. Tria’l amb criteri!",
 "Abans del tancament, revisa si el teu capità té un partit amb opcions de victòria.",
 "Només compten els punts que genera un jugador mentre és a la teva plantilla.",
@@ -768,7 +784,7 @@ setTimeout(nextTip,300); setInterval(nextTip,TIP_MS);
 
 /* ===== PARTITS, TAULA I QR ===== */
 (function(){ const m=location.hash.match(/att=([\w.-]+)/); if(m){ sessionStorage.setItem('pendingAtt',m[1]); history.replaceState(null,'',location.pathname+location.search); } })();
-const fmtMatch=m=>`${new Date(m.match_date+'T12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'})} · ${String(m.start_time).slice(0,5)}`;
+const fmtMatch=m=>`${ymdDate(m.match_date,'12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'})} · ${String(m.start_time).slice(0,5)}`;
 function nextSaturday(){ const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+((6-d.getDay()+7)%7)); return d.toISOString().slice(0,10); }
 function attModal(){
   let m=$('attModal');
@@ -859,32 +875,39 @@ if($('wkDate')){
 }
 
 /* ===== PARTITS A CASA D'AQUESTA JORNADA (INICI) ===== */
-const madridToday=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Madrid'});
+const madridToday=()=>{ try{ const p={}; new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).forEach(x=>p[x.type]=x.value); return `${p.year}-${p.month}-${p.day}`; }catch{ return new Date().toISOString().slice(0,10); } };
+const ymdDate=(d,t)=>{ const [y,m,da]=String(d).split('-').map(Number), [hh,mm]=String(t||'12:00').split(':').map(Number); return new Date(y,(m||1)-1,da||1,hh||0,mm||0); };
 function weekRange(){
   const d=new Date(madridToday()+'T12:00:00Z'), dow=(d.getUTCDay()+6)%7;
   const mon=new Date(d); mon.setUTCDate(d.getUTCDate()-dow); const sun=new Date(mon); sun.setUTCDate(mon.getUTCDate()+6);
   return [mon.toISOString().slice(0,10),sun.toISOString().slice(0,10)];
 }
 async function loadHomeMatches(){
-  if(!$('homeMatches')) return; const [a,b]=weekRange();
-  const r=await api(`club_matches?match_date=gte.${a}&match_date=lte.${b}&order=match_date,start_time&select=id,match_date,start_time,real_team_id,rival`);
-  state.homeMatches=r.ok?await r.json():null; renderHomeMatches();
+  if(!$('homeMatches')) return; const [a,b]=weekRange(); state.homeRange=[a,b];
+  try{
+    const r=await api(`club_matches?match_date=gte.${a}&match_date=lte.${b}&order=match_date,start_time&select=id,match_date,start_time,real_team_id,rival`);
+    if(!r.ok) throw new Error((await r.text()).slice(0,140));
+    state.homeMatches=await r.json(); state.homeError=null;
+  }catch(e){ state.homeMatches=null; state.homeError=e.message||'Error de connexió'; }
+  renderHomeMatches();
 }
 function renderHomeMatches(){
   const box=$('homeMatches'); if(!box||state.homeMatches===undefined) return;
-  if(state.homeMatches===null){ box.innerHTML='<p class="st-empty">No s’han pogut carregar els partits.</p>'; return; }
-  if(!state.homeMatches.length){ box.innerHTML='<p class="st-empty">Encara no hi ha partits publicats per aquesta jornada. Torna-hi després de la reunió de dilluns!</p>'; return; }
+  if(state.homeMatches===null){ box.innerHTML=`<p class="st-empty">No s’han pogut carregar els partits. <a href="#" id="hmRetry">Tornar-ho a provar</a><br><small>${escapeHtml(state.homeError||'')}</small></p>`; const rt=$('hmRetry'); if(rt) rt.onclick=e=>{ e.preventDefault(); box.innerHTML='<p class="st-empty">Carregant partits…</p>'; loadHomeMatches(); }; return; }
+  if(!state.homeMatches.length){ const [ra,rb]=state.homeRange||weekRange(), f=s=>s.slice(8)+'/'+s.slice(5,7); box.innerHTML=`<p class="st-empty">Encara no hi ha partits publicats per aquesta jornada (del ${f(ra)} al ${f(rb)}).</p>`; return; }
   const now=Date.now(), today=madridToday(), days=[...new Set(state.homeMatches.map(m=>m.match_date))];
   box.innerHTML=days.map(d=>{
     const ms=state.homeMatches.filter(m=>m.match_date===d);
-    const title=new Date(d+'T12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'});
+    const title=ymdDate(d,'12:00').toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'});
     return `<div class="hm-day${d===today?' today':''}"><b>${escapeHtml(title)}</b>${d===today?'<span class="hm-badge">Avui</span>':''}</div>`+ms.map(m=>{
-      const st=new Date(`${m.match_date}T${m.start_time}`).getTime(), live=now>=st&&now<st+72e5, done=now>=st+72e5;
+      const st=ymdDate(m.match_date,m.start_time).getTime(), live=now>=st&&now<st+72e5, done=now>=st+72e5;
       return `<div class="hm-row${done?' done':''}"><span class="hm-time">${String(m.start_time).slice(0,5)}</span><span class="hm-match"><b>${escapeHtml(teamName(m.real_team_id))}</b>${m.rival?' <small>vs '+escapeHtml(m.rival)+'</small>':''}</span>${live?'<span class="hm-badge live">🔴 En joc</span>':done?'<span class="hm-badge off">Acabat</span>':''}</div>`;
     }).join('');
   }).join('');
 }
 setInterval(renderHomeMatches,60000);
+
+const APP_VERSION=48; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
