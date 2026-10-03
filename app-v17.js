@@ -75,6 +75,7 @@ async function login(){
 }
 
 function logout(){
+  try{ pushDetach(); }catch(e){}
   state.session=null; state.teamId=null; state.team=null; state.username='';
   localStorage.removeItem('fantasySession');
   showAuth();
@@ -356,7 +357,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -907,7 +908,74 @@ function renderHomeMatches(){
 }
 setInterval(renderHomeMatches,60000);
 
-const APP_VERSION=49; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+
+/* ===== Notificacions push ===== */
+const VAPID_PUBLIC='BNMRPj_EIlmIRcPEIv_TIZ9twNvGMhyyj-K4xQtMTMPSn6ETEOCgw-g0fmeV0IZvfGGexFsYk-uC_iUq8g7ZJ3s';
+const PUSH_KINDS=[['market','⏳ El mercat tanca aviat'],['round','📊 Jornada processada'],['announce','📢 Avisos del club'],['match','🏀 Partits a casa'],['table','📋 Taula (assignació i recordatori)'],['rank','📉 M’han superat a la classificació']];
+function b64ToU8(b){ const s=(b+'='.repeat((4-b.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/'), r=atob(s), u=new Uint8Array(r.length); for(let i=0;i<r.length;i++) u[i]=r.charCodeAt(i); return u; }
+function pushSupport(){
+  const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const standalone=!!(window.navigator.standalone||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches));
+  if('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window) return {ok:true};
+  return {ok:false, why:(ios&&!standalone)?'ios':'unsupported'};
+}
+async function pushGetSub(){ try{ const reg=await navigator.serviceWorker.getRegistration('sw.js')||await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready; return {reg, sub:await reg.pushManager.getSubscription()}; }catch(e){ return {reg:null, sub:null}; } }
+function pushCheckedKinds(){ const l=[...document.querySelectorAll('#pushKinds input:checked')].map(i=>i.value); return l; }
+async function renderPush(){
+  const card=$('pushCard'); if(!card) return;
+  const sup=pushSupport(); card.style.display='';
+  const info=$('pushInfo'), btn=$('pushBtn'), kinds=$('pushKinds'), test=$('pushTest'), off=$('pushOff');
+  if(!sup.ok){
+    btn.style.display='none'; kinds.style.display='none'; test.style.display='none'; off.style.display='none';
+    info.innerHTML=sup.why==='ios'?'A l’iPhone/iPad, per rebre notificacions primer cal <b>afegir aquesta web a la pantalla d’inici</b>: a Safari toca <b>Compartir</b> → <b>Afegeix a la pantalla d’inici</b>, i obre-la des de la nova icona. Després, torna aquí i activa-les (cal iOS 16.4 o superior).':'Aquest navegador no admet notificacions. Prova amb Chrome (Android/ordinador) o amb Safari afegint la web a la pantalla d’inici.';
+    return;
+  }
+  if(Notification.permission==='denied'){
+    btn.style.display='none'; kinds.style.display='none'; test.style.display='none'; off.style.display='none';
+    info.textContent='Has bloquejat les notificacions d’aquesta web. Per activar-les, permet-les als ajustos del navegador (permisos del lloc) i recarrega la pàgina.';
+    return;
+  }
+  const {sub}=await pushGetSub();
+  let kindsSel=PUSH_KINDS.map(k=>k[0]);
+  if(sub){
+    try{ const r=await api(`push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}&select=kinds`); const j=r.ok?await r.json():[]; if(j[0]) kindsSel=j[0].kinds||[]; else { const jj=sub.toJSON(); await rpc('push_save_subscription',{p_endpoint:jj.endpoint,p_p256dh:jj.keys.p256dh,p_auth:jj.keys.auth,p_kinds:kindsSel}); } }catch(e){}
+  }
+  kinds.innerHTML=PUSH_KINDS.map(([k,l])=>`<label class="push-k"><input type="checkbox" value="${k}" ${kindsSel.includes(k)?'checked':''}> ${l}</label>`).join('');
+  kinds.style.display=sub?'':'none'; test.style.display=sub?'':'none'; off.style.display=sub?'':'none';
+  btn.style.display=sub?'none':'';
+  info.textContent=sub?'✅ Notificacions activades en aquest dispositiu. Tria quins avisos vols rebre:':'Rep avisos al mòbil o a l’ordinador: quan tanca el mercat, quan es processa la jornada, partits a casa, taula i més.';
+  kinds.querySelectorAll('input').forEach(i=>i.onchange=async()=>{ try{ await rpc('push_set_kinds',{p_endpoint:sub.endpoint,p_kinds:pushCheckedKinds()}); }catch(e){} });
+}
+async function pushEnable(){
+  try{
+    const reg=await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ alert('Sense permís no podem enviar-te notificacions.'); renderPush(); return; }
+    const sub=(await reg.pushManager.getSubscription())||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToU8(VAPID_PUBLIC)});
+    const j=sub.toJSON();
+    const r=await rpc('push_save_subscription',{p_endpoint:j.endpoint,p_p256dh:j.keys.p256dh,p_auth:j.keys.auth,p_kinds:PUSH_KINDS.map(k=>k[0])});
+    if(!r.ok) throw new Error((await r.text()).slice(0,160));
+    await renderPush();
+    alert('✅ Notificacions activades. Prem «Enviar una prova» per comprovar-ho.');
+  }catch(e){ alert('⚠️ No s’han pogut activar: '+(e.message||e)); }
+}
+async function pushDisable(){
+  try{ const {sub}=await pushGetSub(); if(sub){ try{ await rpc('push_remove_subscription',{p_endpoint:sub.endpoint}); }catch(e){} await sub.unsubscribe(); } }catch(e){}
+  renderPush();
+}
+async function pushDetach(){ try{ if(!('serviceWorker' in navigator)) return; const reg=await navigator.serviceWorker.getRegistration('sw.js'); const sub=reg&&await reg.pushManager.getSubscription(); if(sub) await rpc('push_remove_subscription',{p_endpoint:sub.endpoint}); }catch(e){} }
+async function pushTest(){
+  try{ const r=await rpc('push_test',{}); if(!r.ok) throw new Error((await r.text()).slice(0,160)); alert('Prova enviada. Hauria d’arribar en menys d’un minut.'); }catch(e){ alert('⚠️ '+(e.message||e)); }
+}
+function initPush(){
+  try{
+    if($('pushBtn')&&!$('pushBtn').dataset.bound){ $('pushBtn').dataset.bound='1'; $('pushBtn').onclick=pushEnable; $('pushOff').onclick=pushDisable; $('pushTest').onclick=pushTest; }
+    if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+    renderPush();
+  }catch(e){ console.warn('push',e); }
+}
+
+const APP_VERSION=50; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
