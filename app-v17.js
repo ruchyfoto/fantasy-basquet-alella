@@ -173,7 +173,7 @@ async function loadExtras(){
   const court=$('teamPlayers'); if(!court) return; let d=null;
   court.addEventListener('pointerdown',e=>{ const s=e.target.closest('.slot'); if(!s||!s.querySelector('.pcard')||e.target.closest('button')) return;
     d={s,i:+s.dataset.i,x:e.clientX,y:e.clientY,on:false,t:e.pointerType};
-    if(d.t!=='mouse') d.timer=setTimeout(()=>{ if(d){ d.on=true; s.classList.add('dragging'); navigator.vibrate&&navigator.vibrate(15); } },280); });
+    if(d.t!=='mouse') d.timer=setTimeout(()=>{ if(d){ d.on=true; s.classList.add('dragging'); navigator.vibrate&&navigator.vibrate(15); } },220); });
   window.addEventListener('pointermove',e=>{ if(!d) return; const dx=e.clientX-d.x, dy=e.clientY-d.y;
     if(!d.on){ const m=Math.hypot(dx,dy); if(d.t==='mouse'&&m>6){ d.on=true; d.s.classList.add('dragging'); } else if(d.t!=='mouse'&&m>10){ clearTimeout(d.timer); d=null; } return; }
     d.s.style.setProperty('--dx',dx+'px'); d.s.style.setProperty('--dy',dy+'px'); e.preventDefault(); },{passive:false});
@@ -1387,7 +1387,21 @@ function initBot(){
   if(_botBuilt){ const f=$('botFab'); if(f) f.style.display=''; return; }
   _botBuilt=true;
   const fab=document.createElement('button'); fab.id='botFab'; fab.type='button'; fab.className='bot-fab'; fab.setAttribute('aria-label','Obrir l\'assistent d\'ajuda'); fab.innerHTML='<span>💬</span> Ajuda';
-  fab.onclick=botOpen; document.body.appendChild(fab);
+  document.body.appendChild(fab);
+  // El botó es pot arrossegar i recorda on l'has deixat
+  { let st=null, moved=false;
+    const clamp=(x,y)=>({x:Math.min(Math.max(4,x),window.innerWidth-fab.offsetWidth-4),y:Math.min(Math.max(4,y),window.innerHeight-fab.offsetHeight-4)});
+    const place=(x,y)=>{ const c=clamp(x,y); fab.style.left=c.x+'px'; fab.style.top=c.y+'px'; fab.style.right='auto'; fab.style.bottom='auto'; return c; };
+    try{ const sv=JSON.parse(localStorage.getItem('botFabPos')||'null'); if(sv&&typeof sv.x==='number') place(sv.x,sv.y); }catch(e){}
+    window.addEventListener('resize',()=>{ if(fab.style.left){ const r=fab.getBoundingClientRect(); place(r.left,r.top); } });
+    fab.addEventListener('pointerdown',e=>{ const r=fab.getBoundingClientRect(); st={px:e.clientX,py:e.clientY,x:r.left,y:r.top,id:e.pointerId}; moved=false; try{ fab.setPointerCapture(e.pointerId); }catch(x){} });
+    fab.addEventListener('pointermove',e=>{ if(!st) return; const dx=e.clientX-st.px, dy=e.clientY-st.py;
+      if(!moved&&Math.hypot(dx,dy)>6){ moved=true; fab.classList.add('moving'); try{ fab.setPointerCapture(st.id); }catch(x){} }
+      if(moved){ e.preventDefault(); place(st.x+dx,st.y+dy); } });
+    const end=()=>{ if(!st) return; if(moved){ fab.classList.remove('moving'); const r=fab.getBoundingClientRect(); try{ localStorage.setItem('botFabPos',JSON.stringify({x:Math.round(r.left),y:Math.round(r.top)})); }catch(x){} window.__botMoved=Date.now(); } st=null; };
+    fab.addEventListener('pointerup',end); fab.addEventListener('pointercancel',end);
+    fab.addEventListener('click',()=>{ if(Date.now()-(window.__botMoved||0)<300) return; botOpen(); });
+  }
   const modal=document.createElement('div'); modal.id='botModal'; modal.className='bot-modal'; modal.style.display='none';
   modal.innerHTML=`<div class="bot-box" role="dialog" aria-label="Assistent del Fantasy"><div class="bot-head"><b>🤖 Assistent del Fantasy</b><button type="button" id="botClose" aria-label="Tanca">✕</button></div><div id="botMsgs" class="bot-msgs" aria-live="polite"></div><div class="bot-topics" id="botTopics">${BOT_CATS.map(c=>`<button type="button" class="bot-cat" data-cat="${c.id}">${c.i} ${c.t}</button>`).join('')}</div><form id="botForm" class="bot-form" autocomplete="off"><input id="botInput" type="text" maxlength="200" placeholder="Escriu el teu dubte…" enterkeyhint="send"><button type="submit" aria-label="Envia">➤</button></form></div>`;
   document.body.appendChild(modal);
@@ -1404,7 +1418,7 @@ function initBot(){
 }
 /*BOT-UI-END*/
 
-const APP_VERSION=62; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=63; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
