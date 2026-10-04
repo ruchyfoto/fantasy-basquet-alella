@@ -149,7 +149,7 @@ function courtCard(p,isCap){
 function benchCard(c,realTeamId){
   const m=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
   const photo=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
-  return `<div class="bench-card" data-cid="${c.id}" data-ctid="${realTeamId}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(coachName(c))}" data-ph="🧑‍🏫" onerror="fixImageError(this)"><div><b>${escapeHtml(coachName(c))}</b><small>🏀 ${escapeHtml(teamName(realTeamId))} · ${money(m?.current_value??c.current_value)}</small><div><button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">💸 Vendre</button></div></div></div>`;
+  return `<div class="bench-card" data-cid="${c.id}" data-ctid="${realTeamId}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(coachName(c))}" data-ph="🧑‍🏫" onerror="fixImageError(this)"><div><b>${escapeHtml(coachName(c))}</b><small>🏀 ${escapeHtml(teamName(realTeamId))} · ${money(m?.current_value??c.current_value)}</small><small class="pts">⭐ Aporta: ${f1(state.coachPts?.[c.id+':'+realTeamId]||0)} pts</small><div><button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">💸 Vendre</button></div></div></div>`;
 }
 function goMarket(type){ showSection('market'); const b=document.querySelector(`.market-tab[data-market="${type}"]`); if(b) b.click(); }
 function renderTeam(){
@@ -164,7 +164,8 @@ function renderTeam(){
   bindActions();
 }
 async function loadExtras(){
-  const [pt,ts,ln]=await Promise.all([rpc('get_player_points',{}),rpc('get_team_stats',{}),api('fantasy_lineups?select=slots&limit=1')]);
+  const [pt,ts,ln,cpR]=await Promise.all([rpc('get_player_points',{}),rpc('get_team_stats',{}),api('fantasy_lineups?select=slots&limit=1'),rpc('get_my_coach_points',{}).catch(()=>null)]);
+  state.coachPts=(cpR&&cpR.ok)?await cpR.json().catch(()=>({})):{};
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
@@ -614,8 +615,9 @@ function svgLine(vals,labs){
   return `<svg viewBox="0 0 ${W} ${H}" class="st-svg"><polygon points="${x(0)},${H-p} ${pts} ${x(n-1)},${H-p}" fill="rgba(232,118,44,.14)"/><polyline class="draw" pathLength="1" points="${pts}" fill="none" stroke="#e8762c" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="#e8762c"/>${i%st===0||i===n-1?`<text x="${x(i)}" y="${y(v)-9}" text-anchor="middle" font-size="9" font-weight="700" fill="#24332c">${f1(v)}</text><text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="9" fill="#5d6d65">${labs[i]}</text>`:''}`).join('')}</svg>`;
 }
 function svgBars(rows,labs){
-  const W=320,H=150,p=28,n=rows.length,mx=Math.max(1,...rows.map(r=>Number(r.total_points||0))),cw=(W-2*p)/n,bw=Math.min(30,cw-6),y=v=>H-p-(v/mx)*(H-2*p-10);
-  return `<svg viewBox="0 0 ${W} ${H}" class="st-svg"><line x1="${p}" x2="${W-p}" y1="${H-p}" y2="${H-p}" stroke="#ccd5cf"/>${rows.map((r,i)=>{const w=Number(r.win_points||0),h=Number(r.highlight_points||0),cx=p+cw*(i+.5),x=cx-bw/2;return `<rect x="${x}" y="${y(w)}" width="${bw}" height="${H-p-y(w)}" rx="3" fill="#0f6b46"/><rect x="${x}" y="${y(w+h)}" width="${bw}" height="${y(w)-y(w+h)}" rx="3" fill="#e8762c"/><text x="${cx}" y="${y(w+h)-4}" text-anchor="middle" font-size="9" font-weight="700" fill="#24332c">${f1(w+h)}</text><text x="${cx}" y="${H-8}" text-anchor="middle" font-size="9" fill="#5d6d65">${labs[i]}</text>`;}).join('')}</svg>`;
+  const W=320,H=150,p=28,n=rows.length, tots=rows.map(r=>Number(r.total_points||0)), mx=Math.max(1,...tots), mn=Math.min(0,...tots), cw=(W-2*p)/n, bw=Math.min(30,cw-6);
+  const y=v=>H-p-((v-mn)/(mx-mn))*(H-2*p-10), seg=(x,a,b,c)=>`<rect x="${x}" y="${Math.min(y(a),y(b))}" width="${bw}" height="${Math.max(0,Math.abs(y(a)-y(b)))}" rx="3" fill="${c}"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="st-svg"><line x1="${p}" x2="${W-p}" y1="${y(0)}" y2="${y(0)}" stroke="#ccd5cf"/>${rows.map((r,i)=>{const w=Number(r.win_points||0),h=Number(r.highlight_points||0),cx=p+cw*(i+.5),x=cx-bw/2;return seg(x,0,w,w<0?'#c0392b':'#0f6b46')+seg(x,w,w+h,'#e8762c')+`<text x="${cx}" y="${y(Math.max(w+h,0))-4}" text-anchor="middle" font-size="9" font-weight="700" fill="#24332c">${f1(w+h)}</text><text x="${cx}" y="${H-8}" text-anchor="middle" font-size="9" fill="#5d6d65">${labs[i]}</text>`;}).join('')}</svg>`;
 }
 function closeStats(){ const m=$('statsModal'); if(m) m.classList.remove('open'); document.body.style.overflow=''; }
 async function openStats(id,kind='player',teamId=null){
@@ -681,7 +683,7 @@ const TOUR=[
  {i:'🛒',t:'El mercat',go:'market',h:`<p>Aquí fitxes jugadors i entrenadors. Canvia entre <b>Jugadors</b> i <b>Entrenadors</b> a dalt, i fes servir el cercador i el filtre d’equip.</p><ul><li>Prem <span class="demo">Fitxar · 10,0 M€</span> per fitxar. A la compra s’hi suma una <b>comissió del 5%</b>.</li><li>Toca la targeta (no el botó) per veure’n les <b>estadístiques</b>.</li><li>Cada targeta mostra el <b>valor</b> i els <b>punts</b> que porta.</li></ul>`},
  {i:'👕',t:'La teva plantilla',go:'team',h:`<p>És el teu equip: els <b>entrenadors a dalt</b> i els <b>8 jugadors</b> sobre la pista.</p><div class="tour-legend"><span class="demo">C</span><span>El <b>capità</b>: suma <b>+10 punts extra</b> al teu equip cada jornada que <b>guanya</b></span><span class="demo grey">☆ / ⭐</span><span>Fer capità aquest jugador</span><span class="demo grey">💸</span><span>Vendre’l: et retornen el valor actual, sense comissió</span><span class="demo grey">+</span><span>Lloc buit: et porta al mercat per fitxar-ne un</span></div><p>Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega.</p>`},
  {i:'📊',t:'Estadístiques',h:`<p>Toca qualsevol targeta de jugador o d’entrenador per obrir la seva fitxa:</p><ul><li>Punts totals, victòries, ratxa i valor.</li><li>Gràfica de l’<b>evolució del valor</b> i dels <b>punts per jornada</b>.</li><li>La <b>popularitat</b>: quants equips Fantasy el tenen.</li></ul><p>A <b>Equips</b> hi ha tots els integrants de cada equip real, amb els partits guanyats i la popularitat.</p>`},
- {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugadors destacats</b>: l’entrenador n’escull fins a 3 per ordre després del partit: <b>+7, +5 i +3 punts</b> extra, encara que l’equip perdi.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
+ {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>+10 punts</b> per cada jugador teu. Amb <b>ratxa</b> 🔥 (victòries seguides) en suma més: <b>11</b> la 2a seguida, <b>12</b> la 3a, <b>13</b> la 4a…</li><li><b>Derrota</b>: <b>−4 punts</b> per cada jugador teu i la ratxa es reinicia.</li><li><b>Jugadors destacats</b>: l’entrenador n’escull fins a 3 per ordre després del partit: <b>+7, +5 i +3 punts</b> extra, encara que l’equip perdi.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
  {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Màxim <b>1 jugador de cada equip real</b>, amb una excepció: <b>a partir del 5 d’octubre pots tenir-ne 2 del mateix equip</b>, però només d’un equip.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
  {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs el <b>calendari d’aquesta jornada</b>: tots els partits, a casa (🏠) i a fora (✈️), amb l’hora i l’estat. El QR només hi és als partits a casa. Els marcats amb <b>⭐ x2</b> donen el doble de punts.</li><li>Si vas a veure partits <b>setmanes seguides</b>, tens bonus: <b>+2</b> a la 3a setmana i <b>+5</b> a la 5a.</li><li>Completa les <b>missions</b> i convida amics amb el teu <b>codi</b> per sumar punts extra.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
@@ -788,7 +790,8 @@ const TIPS=[
 "Quan un partit surt marcat amb ⭐ x2, els punts d’assistència valen el doble.",
 "Amb el mercat tancat tampoc es pot vendre ni canviar de capità.",
 "Cada victòria suma punts: 12 la primera, 13 la segona seguida, 14 la tercera…",
-"La ratxa és or: cada victòria seguida d’un jugador suma 1 punt més.",
+"Cada derrota d’un jugador resta 4 punts: vigila amb els equips que no passen per un bon moment.",
+"La ratxa és or: a partir de la 2a victòria seguida, cada victòria suma 1 punt més.",
 "L’entrenador tria 3 destacats per equip: el 1r suma +7 punts, el 2n +5 i el 3r +3, encara que l’equip perdi.",
 "El capità suma +10 punts extra a l’equip quan guanya. Tria’l amb criteri!",
 "Abans del tancament, revisa si el teu capità té un partit amb opcions de victòria.",
@@ -800,7 +803,7 @@ const TIPS=[
 "Mira les estadístiques abans de fitxar: toca la targeta del jugador.",
 "La gràfica d’evolució del valor t’ajuda a detectar qui puja.",
 "La popularitat indica quants equips tenen un jugador: un de poc popular et fa diferent.",
-"Un jugador d’un equip amb bona ratxa té més opcions de sumar punts extra.",
+"Els destacats (+7, +5, +3) són l’única manera de sumar punts quan el teu jugador perd.",
 "Fitxa abans que un jugador pugi de valor, no després.",
 "No gastis tot el pressupost el primer dia: guarda marge per a les oportunitats.",
 "Fixa’t en la ratxa actual de cada jugador a la seva fitxa.",
@@ -823,7 +826,7 @@ const TIPS=[
 "Cada jornada és una nova oportunitat: revisa la teva plantilla abans de cada tancament.",
 "Comparteix el joc amb la família i els amics del club i competiu junts!",
 "Anima l’equip als partits: els resultats reals són els que fan pujar els punts. 🏀",
-"Una ratxa llarga pot marcar la diferència entre els primers de la classificació.",
+"Una bona estratègia de pronòstics i d’assistència pot marcar la diferència entre els primers.",
 "Si canvies de capità, fes-ho abans que tanqui el mercat.",
 "Només sumen punts els jugadors dels equips que tenen resultat registrat a la jornada.",
 "Vés a veure un partit del club i escaneja el QR de la taula: +3 punts per partit!",
@@ -1222,19 +1225,21 @@ const BOT_KB=[
 
 /* ---------- PUNTS ---------- */
 {c:'points',q:'Com es guanyen punts?',k:'punts, puntos, com sumo, sumar, puntuacio, puntuacion, guanyar punts, ganar puntos, sistema de punts, resum',
- a:`<ul><li>🏀 <b>Victòria</b> del seu equip: a partir de 12 punts (amb ratxa, més).</li><li>⭐ <b>Destacats</b> de l'entrenador: +7 / +5 / +3.</li><li>🅒 <b>Capità</b>: +10 si el seu equip guanya.</li><li>👀 <b>Anar a veure un partit</b>: +3 (el doble en partits x2).</li><li>🎯 <b>Missions, ratxa d'assistència, pronòstics i amics</b>: punts extra.</li></ul>`,go:'rules'},
-{c:'points',q:'Quants punts val una victòria?',k:'victoria, victoria punts, guanya, gana, win, 12 punts, 10 punts, valor victoria, quants punts per guanyar',
- a:`Una victòria val <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria consecutiva suma 1 punt més: és la <b>ratxa</b> 🔥. Si l'equip perd, no suma per victòria i la ratxa es reinicia.`},
-{c:'points',q:'Què és la ratxa?',k:'ratxa, racha, victories seguides, consecutives, streak, seguides, 🔥',
- a:`La <b>ratxa</b> 🔥 compta les victòries <b>seguides</b> d'un equip. Cada victòria consecutiva puja en 1 punt el que val guanyar (12, 13, 14…). Perdre la reinicia a zero.`},
+ a:`<ul><li>🏀 <b>Victòria</b> del seu equip: +10 punts (més amb ratxa). <b>Derrota</b>: −4.</li><li>⭐ <b>Destacats</b> de l'entrenador: +7 / +5 / +3.</li><li>🅒 <b>Capità</b>: +10 si el seu equip guanya.</li><li>👀 <b>Anar a veure un partit</b>: +3 (el doble en partits x2).</li><li>🎯 <b>Missions, ratxa d'assistència, pronòstics i amics</b>: punts extra.</li></ul>`,go:'rules'},
+{c:'points',q:'Quants punts val una victòria o una derrota?',k:'victoria, derrota, victoria punts, guanya, gana, win, 10 punts, valor victoria, quants punts per guanyar, perd, pierde, quants punts resta, restar, 4 punts, -4, derrota punts',
+ a:`Per cada jugador teu: <b>victòria = +10 punts</b> (més si porta <b>ratxa</b>: 11 la 2a victòria seguida, 12 la 3a, 13 la 4a…) i <b>derrota = −4 punts</b>. Els destacats de l'entrenador hi sumen a part (+7 / +5 / +3), també si l'equip perd. Els entrenadors sumen quan el seu equip guanya.`},
+{c:'points',q:'Què és la ratxa?',k:'ratxa, racha, victories seguides, consecutives, streak, seguides, 🔥, 2a victoria, segona victoria',
+ a:`La <b>ratxa</b> 🔥 compta les victòries <b>seguides</b> d'un equip. A partir de la <b>2a victòria seguida</b>, cada jugador suma 1 punt més per cada victòria consecutiva: <b>10</b> la 1a, <b>11</b> la 2a, <b>12</b> la 3a, <b>13</b> la 4a… També influeix en el valor. Si l'equip perd, la ratxa es reinicia.`},
 {c:'points',q:'Què són els jugadors destacats?',k:'destacat, destacats, destacado, destacados, highlight, 7 5 3, tres destacats, mvp, millor jugador, 7 punts, 5 punts, 3 punts, primer segon tercer',
  a:`Després del partit, l'<b>entrenador</b> de cada equip tria fins a <b>3 jugadors destacats, ordenats per importància</b>: el 1r rep <b>+7 punts</b>, el 2n <b>+5</b> i el 3r <b>+3</b>. Els reben encara que l'equip perdi. Sumen al jugador i, per tant, als equips Fantasy que el tinguin.`},
-{c:'points',q:'Hi ha punts negatius?',k:'negatius, negativos, restar, perdre punts, perder puntos, baixar punts, penalitzacio, penalizacion, menys punts',
- a:`<b>No.</b> Els punts només sumen, mai resten. El que sí que pot baixar és el <b>valor</b> d'un jugador o entrenador si el seu equip perd.`},
+{c:'points',q:'On veig els punts que em donen els entrenadors?',k:'punts entrenadors, puntos entrenadores, quant em dona el meu entrenador, aporta, aporten, punts que aporta, entrenador aporta, contribucio',
+ a:`A la pestanya <b>Plantilla</b>, a la targeta de cada entrenador (a sota dels jugadors) hi ha la línia <b>⭐ Aporta: X pts</b>: són els punts que aquell entrenador ha sumat al <b>teu</b> equip, comptant només des que el vas fitxar.`,go:'team'},
+{c:'points',q:'Hi ha punts negatius?',k:'negatius, negativos, restar, perdre punts, perder puntos, baixar punts, penalitzacio, penalizacion, menys punts, puc tenir punts negatius, sota zero',
+ a:`<b>Sí, però només per les derrotes</b>: cada jugador teu que perd resta <b>−4 punts</b>. Els destacats (+7 / +5 / +3) i els punts extra (assistència, missions, pronòstics…) compensen. Per tant, el total d'un equip pot ser negatiu si fitxes jugadors d'equips que perden molt.`},
 {c:'points',q:'Quan se sumen els punts?',k:'quan, cuando, actualitzar punts, actualizar, processar jornada, processada, se sumen, no veig punts, tarden, retard, aparece',
  a:`Els punts no es veuen al moment: se sumen quan <b>l'organitzador processa la jornada</b>, després d'introduir tots els resultats reals i els destacats dels entrenadors. Fins llavors, la classificació no es mou.`},
 {c:'points',q:'Per què no he sumat punts?',k:'no he sumat, no me han sumado, zero punts, cero puntos, per que no, por que no, falten punts, punts incorrectes, error punts, no compta',
- a:`Possibles motius:<ul><li>⏳ La jornada <b>encara no s'ha processat</b>.</li><li>🏀 El seu equip <b>va perdre</b> (no hi ha punts de victòria).</li><li>🔒 El jugador <b>no era a la teva plantilla</b> quan es va tancar la jornada.</li><li>🧑‍🏫 Els destacats encara no els havia triat l'entrenador.</li></ul><p>Si creus que hi ha un error, digues-ho a l'organitzador amb el nom del jugador i la jornada.</p>`},
+ a:`Possibles motius:<ul><li>⏳ La jornada <b>encara no s'ha processat</b>.</li><li>🏀 El seu equip <b>va perdre</b> (en aquest cas els punts baixen −4, tret que fos destacat).</li><li>🔒 El jugador <b>no era a la teva plantilla</b> quan es va tancar la jornada.</li><li>🧑‍🏫 Els destacats encara no els havia triat l'entrenador.</li></ul><p>Si creus que hi ha un error, digues-ho a l'organitzador amb el nom del jugador i la jornada.</p>`},
 {c:'points',q:'Per què el meu jugador té punts però jo no?',k:'jugador te punts, el jugador suma, no suma a mi, punts jugador, punts equip fantasy diferencia',
  a:`Els punts d'un jugador són els que genera <b>ell</b>. Tu només en cobres els que va fer <b>mentre era a la teva plantilla</b>. Si el vas fitxar després, no compten.`},
 
@@ -1302,7 +1307,7 @@ const BOT_KB=[
 {c:'app',q:'On trobo la guia de com es juga?',k:'guia, tour, tutorial, ajuda, ayuda, com funciona tot, manual, explicacio, instruccions',
  a:`A <b>Regles → ❓ Veure la guia</b> tens una guia pas a pas de tot el joc. A la pestanya Regles també hi ha un resum de totes les normes.`,go:'rules'},
 {c:'app',q:'Quines són totes les regles?',k:'regles, reglas, normes, normas, reglament, reglamento, resum regles, condicions',
- a:`Resum:<ul><li>💰 120 M€ · 👕 8 jugadors + 🧑‍🏫 2 entrenadors.</li><li>🛒 Compra amb 5% de comissió; venda sense.</li><li>🔁 Màxim 2 fitxatges per jornada.</li><li>🏀 Màxim 1 jugador per equip real (2 d'un sol equip des del 5/10).</li><li>🔒 Mercat tancat de dijous 23:59 fins a la jornada següent.</li><li>⭐ Victòria + ratxa, destacats 7/5/3, capità +10, assistència +3.</li></ul>`,go:'rules'},
+ a:`Resum:<ul><li>💰 120 M€ · 👕 8 jugadors + 🧑‍🏫 2 entrenadors.</li><li>🛒 Compra amb 5% de comissió; venda sense.</li><li>🔁 Màxim 2 fitxatges per jornada.</li><li>🏀 Màxim 1 jugador per equip real (2 d'un sol equip des del 5/10).</li><li>🔒 Mercat tancat de dijous 23:59 fins a la jornada següent.</li><li>⭐ Victòria +10 (+1 per ratxa), derrota −4, destacats 7/5/3, capità +10, assistència +3.</li></ul>`,go:'rules'},
 {c:'app',q:'És segur? Quines dades guardeu?',k:'privacitat, privacidad, dades, datos, seguretat, seguridad, rgpd, proteccio dades, privat, menors, nens',
  a:`Només es guarda el que cal per jugar: el teu correu, el nom del teu equip Fantasy i la teva activitat al joc (fitxatges, assistències, pronòstics). Per a qualsevol dubte sobre les teves dades, parla amb l'organitzador del club.`},
 
@@ -1556,12 +1561,12 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('[data-bd]'); const box=$('badgeBox'); if(!t||!box||!box.contains(t)) return;
   const b=(state.badges&&state.badges.badges||[]).find(x=>x.code===t.dataset.bd); if(!b) return;
   box.querySelectorAll('.bd').forEach(x=>x.classList.toggle('sel',x===t));
-  const prog=b.earned?'✅ Aconseguida':(b.goal>1?`Progrés: ${b.progress}/${b.goal}`:'Encara no aconseguida');
+  const prog=b.earned?'✅ Aconseguida':(b.goal>1?`Progrés: ${Math.max(0,b.progress)}/${b.goal}`:'Encara no aconseguida');
   $('bdInfo').innerHTML=`<b>${b.icon} ${escapeHtml(b.title)}</b><br>${escapeHtml(b.desc)}<br><small>${prog}</small>`;
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=68; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=70; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
