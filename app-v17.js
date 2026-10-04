@@ -79,7 +79,7 @@ function logout(){
   _isClub=null;
   try{ pushDetach(); }catch(e){}
   try{ botHide(); }catch(e){}
-  state.leagues=null; state.lgOpen=null;
+  state.leagues=null; state.lgOpen=null; state.summary=null; state.badges=null;
   state.session=null; state.teamId=null; state.team=null; state.username='';
   localStorage.removeItem('fantasySession');
   showAuth();
@@ -380,7 +380,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); initBot(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); initBot(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -743,6 +743,8 @@ $('renameTeam').onclick=async()=>{
 /* ===== CONSELLS AUTOMÀTICS ===== */
 const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
 const TIPS=[
+"Cada setmana, a l’Inici, tens el resum de la jornada: equips, jugador i joia de la jornada.",
+"Toca una insígnia per veure què cal fer per aconseguir-la. Algunes són molt difícils!",
 "Crea una lliga privada amb la família o els amics a Classificació → 👥 Lligues.",
 "Tens algun dubte? Toca el botó 💬 Ajuda de dalt a la dreta i l’assistent te’l resol.",
 "Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
@@ -1239,6 +1241,10 @@ const BOT_KB=[
  a:`A <b>Classificació → 👥 Lligues</b>: escriu un nom i prem <b>Crear</b> (et donarà un codi de 6 lletres), o escriu el codi que t'hagin passat i prem <b>Unir-me</b>. També pots tocar <b>Convidar</b> per compartir un enllaç que t'hi uneix directament.`,go:'ranking'},
 {c:'rank',q:'Quanta gent pot haver-hi a una lliga? Qui la veu?',k:'quanta gent lliga, maxim lliga, cinc lligues, 30 persones, privacitat lliga, qui veu la lliga, treure algu lliga, sortir lliga, esborrar lliga, limit lligues',
  a:`Fins a <b>30 persones</b> per lliga i <b>5 lligues</b> per persona. Només la veuen els que hi són (cal el codi per entrar). Qui l'ha creat pot <b>treure participants</b> o <b>esborrar-la</b>, i qualsevol pot <b>sortir-ne</b> quan vulgui.`,go:'ranking'},
+{c:'rank',q:'Què és el resum de la jornada?',k:'resum, resumen, resum jornada, resumen jornada, equip de la jornada, jugador de la jornada, joia, joya, millor jugador jornada, qui ha guanyat la jornada, novetats jornada',
+ a:`Quan l'organitzador <b>processa la jornada</b>, a l'<b>Inici</b> apareix el seu resum: els <b>3 millors equips Fantasy</b> de la jornada, el <b>jugador de la jornada</b>, la <b>joia</b> (el jugador que més punts ha donat per al que valia), els resultats del club i el pronòstic més encertat. Pots veure també les jornades anteriors.`,go:'home'},
+{c:'extra',q:'Què són les insígnies?',k:'insignies, insignia, medalles, medallas, logros, trofeus, trofeos, badges, premis petits, reconeixement, aconseguir insignia, desbloquejar',
+ a:`Les <b>insígnies</b> són petits reconeixements que es guanyen soles quan fas coses: el primer fitxatge, veure partits, ratxes, missions, pronòstics, convidar amics, ser al podi… <b>No donen punts</b>, però es veuen a l'<b>Inici</b>. Toca una insígnia per saber com aconseguir-la i quant en portes.`,go:'home'},
 {c:'rank',q:'Hi ha premis?',k:'premi, premio, premios, regal, guanyador, ganador, que es guanya, recompensa, trofeu',
  a:`Els premis (si n'hi ha) els decideix l'<b>organitzador del club</b>. Pregunta-li directament o mira els avisos del club.`},
 {c:'rank',q:'On veig els resultats reals dels partits?',k:'resultats, resultados, marcador, marcadors, resultat, com ha quedat, quant han quedat, score',
@@ -1477,7 +1483,61 @@ async function redeemLeague(){
   catch(err){ alert('⚠️ No m’he pogut unir a la lliga: '+(err.message||err)); }
 }
 
-const APP_VERSION=65; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+/* ===== RESUM DE LA JORNADA ===== */
+async function loadSummary(roundId){
+  const card=$('sumCard'), box=$('sumBox'); if(!card||!box) return;
+  try{
+    const d=await lgCall('get_round_summary',roundId?{p_round:roundId}:{});
+    state.summary=d; renderSummary();
+  }catch(e){ card.style.display='none'; }
+}
+function renderSummary(){
+  const card=$('sumCard'), box=$('sumBox'), d=state.summary; if(!card||!box) return;
+  if(!d||!d.available){ card.style.display='none'; return; }
+  card.style.display='';
+  const fmt=v=>Number(v||0).toFixed(1).replace('.',','), medal=['🥇','🥈','🥉'];
+  const sel=(d.rounds||[]).length>1?`<select id="sumSel" class="sum-sel" aria-label="Tria la jornada">${d.rounds.map(r=>`<option value="${r.id}"${r.id===d.round_id?' selected':''}>Jornada ${r.round_number}</option>`).join('')}</select>`:`<span class="sum-pill">Jornada ${d.round_number}</span>`;
+  let h=`<div class="sum-head">${sel}${d.results&&d.results.total?`<span class="sum-club">🏀 Victòries ${d.results.wins} · Derrotes ${d.results.losses}</span>`:''}</div>`;
+  if(d.me) h+=`<div class="sum-me">El teu equip: posició <b>${d.me.position}</b> amb <b>${fmt(d.me.pts)} pts</b> aquesta jornada</div>`;
+  if((d.top_teams||[]).length) h+=`<div class="sum-sec">🏆 Equips de la jornada</div>`+d.top_teams.map(t=>`<div class="sum-row${t.is_me?' mine':''}"><span>${medal[t.pos-1]||t.pos}</span><b>${escapeHtml(t.name)}${t.is_me?' <small>(tu)</small>':''}</b><em>${fmt(t.pts)} pts</em></div>`).join('');
+  if(d.player) h+=`<div class="sum-sec">⭐ Jugador de la jornada</div><div class="sum-row"><span>🏀</span><b>${escapeHtml(d.player.name)}<small>${escapeHtml(d.player.team||'')}</small></b><em>${fmt(d.player.pts)} pts</em></div>`;
+  if(d.gem) h+=`<div class="sum-sec">💎 La joia de la jornada</div><div class="sum-row"><span>💎</span><b>${escapeHtml(d.gem.name)}<small>${escapeHtml(d.gem.team||'')} · valia ${fmt(d.gem.value)} M€</small></b><em>${fmt(d.gem.pts)} pts</em></div>`;
+  const pr=d.predictions||{}; if(pr.best||pr.perfect) h+=`<div class="sum-sec">🔮 Pronòstics</div>`+(pr.best?`<div class="sum-line">Equip més ben pronosticat: <b>${escapeHtml(pr.best.team)}</b> (${pr.best.pct}% d’encerts)</div>`:'')+(pr.perfect?`<div class="sum-line">Plenaris aquesta jornada: <b>${pr.perfect}</b> 🎰</div>`:'');
+  box.innerHTML=h;
+  const s=$('sumSel'); if(s) s.onchange=()=>loadSummary(Number(s.value));
+}
+/* ===== INSÍGNIES ===== */
+async function loadBadges(){
+  const card=$('badgeCard'), box=$('badgeBox'); if(!card||!box) return;
+  try{
+    const d=await lgCall('get_my_badges');
+    if(!d||!d.total){ card.style.display='none'; return; }
+    state.badges=d; renderBadges();
+    const nw=(d.new||[]); if(nw.length){
+      let seen={}; try{ seen=JSON.parse(localStorage.getItem('badgesSeen')||'{}'); }catch{}
+      const fresh=nw.filter(c=>!seen[c]);
+      if(fresh.length){ fresh.forEach(c=>seen[c]=1); try{ localStorage.setItem('badgesSeen',JSON.stringify(seen)); }catch{}
+        const names=fresh.map(c=>{ const b=d.badges.find(x=>x.code===c); return b?`${b.icon} ${b.title}`:c; });
+        confetti(); setTimeout(()=>alert('🏅 Nova insígnia'+(names.length>1?'s':'')+'!\n'+names.join('\n')),400); }
+    }
+  }catch(e){ card.style.display='none'; }
+}
+function renderBadges(){
+  const card=$('badgeCard'), box=$('badgeBox'), d=state.badges; if(!card||!box||!d) return;
+  card.style.display='';
+  $('badgeSub').textContent=`${d.earned} de ${d.total} aconseguides`;
+  box.innerHTML=`<div class="bd-grid">${d.badges.map(b=>`<button type="button" class="bd${b.earned?' on':''}" data-bd="${b.code}"><span class="bd-i">${b.earned?b.icon:'🔒'}</span><span class="bd-t">${escapeHtml(b.title)}</span></button>`).join('')}</div><div id="bdInfo" class="bd-info">Toca una insígnia per veure com aconseguir-la.</div>`;
+}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-bd]'); const box=$('badgeBox'); if(!t||!box||!box.contains(t)) return;
+  const b=(state.badges&&state.badges.badges||[]).find(x=>x.code===t.dataset.bd); if(!b) return;
+  box.querySelectorAll('.bd').forEach(x=>x.classList.toggle('sel',x===t));
+  const prog=b.earned?'✅ Aconseguida':(b.goal>1?`Progrés: ${b.progress}/${b.goal}`:'Encara no aconseguida');
+  $('bdInfo').innerHTML=`<b>${b.icon} ${escapeHtml(b.title)}</b><br>${escapeHtml(b.desc)}<br><small>${prog}</small>`;
+});
+setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
+
+const APP_VERSION=66; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
