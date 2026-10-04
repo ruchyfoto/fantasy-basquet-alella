@@ -1259,10 +1259,8 @@ const BOT_KB=[
 /* ---------- APP I AVISOS ---------- */
 {c:'app',q:'Com instal·lo l\'app al mòbil?',k:'instalar, instal·lar, app, aplicacio, descarregar, descargar, icona, icono, pantalla inici, afegir pantalla, android, iphone, ios, pwa',
  a:`<b>Android (Chrome):</b> obre la web, prem el menú ⋮ i tria <i>Instal·la l'app</i> (o fes servir la targeta d'Instal·lar que surt a Inici).<br><b>iPhone (Safari):</b> prem <i>Compartir</i> ⬆️ i tria <i>Afegeix a pantalla d'inici</i>.<br>Quedarà amb la icona verda del club, com una app més.`,go:'home'},
-{c:'app',q:'Com activo les notificacions?',k:'notificacions, notificaciones, avisos, avisar, push, alertes, alertas, notificar, recordatori, recordatorio, activar avisos',
- a:`A <b>Inici</b> hi ha la targeta de <b>notificacions</b>: prem <b>Activar</b> i accepta el permís. T'avisarem dels tancaments de mercat, resultats i altres novetats. Pots provar-ho amb el botó de prova.<br><b>Important a iPhone:</b> primer cal instal·lar l'app a la pantalla d'inici (iOS 16.4 o superior).`,go:'home'},
-{c:'app',q:'No m\'arriben les notificacions',k:'no arriben notificacions, no llegan notificaciones, no avisos, no rebo, sense notificacions, push no funciona, silenciat',
- a:`Revisa:<ul><li>🔔 Que les hagis <b>activat</b> a la targeta d'Inici (un cop per dispositiu).</li><li>⚙️ Que el mòbil o el navegador tinguin els <b>permisos</b> de notificacions per a aquesta app.</li><li>📱 A iPhone, que l'app estigui <b>instal·lada a la pantalla d'inici</b>.</li><li>🌙 Que no tinguis el mode no molestar actiu.</li></ul>Prova el botó de <b>notificació de prova</b>.`},
+{c:'app',q:'Hi ha notificacions?',k:'notificacions, notificaciones, avisos, avisar, push, alertes, alertas, notificar, recordatori, recordatorio, activar avisos, no arriben notificacions',
+ a:`De moment l'app <b>no envia notificacions</b>. Per estar al dia, mira la franja del mercat i el calendari de l'<b>Inici</b>, on surten el compte enrere del tancament i els partits de la setmana.`,go:'home'},
 {c:'app',q:'On trobo la guia de com es juga?',k:'guia, tour, tutorial, ajuda, ayuda, com funciona tot, manual, explicacio, instruccions',
  a:`A <b>Regles → ❓ Veure la guia</b> tens una guia pas a pas de tot el joc. A la pestanya Regles també hi ha un resum de totes les normes.`,go:'rules'},
 {c:'app',q:'Quines són totes les regles?',k:'regles, reglas, normes, normas, reglament, reglamento, resum regles, condicions',
@@ -1406,7 +1404,7 @@ function initBot(){
 }
 /*BOT-UI-END*/
 
-const APP_VERSION=60; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=61; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
