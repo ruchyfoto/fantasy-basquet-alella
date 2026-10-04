@@ -79,6 +79,7 @@ function logout(){
   _isClub=null;
   try{ pushDetach(); }catch(e){}
   try{ botHide(); }catch(e){}
+  state.leagues=null; state.lgOpen=null;
   state.session=null; state.teamId=null; state.team=null; state.username='';
   localStorage.removeItem('fantasySession');
   showAuth();
@@ -219,11 +220,11 @@ function renderResults(){
   api(`team_round_results?round_id=eq.${state.round.id}&select=real_team_id,result&order=real_team_id`).then(async r=>{if(!r.ok)throw new Error(await r.text());const rows=await r.json();$('resultsList').innerHTML=rows.length?rows.map(x=>`<div class="match"><div><b>${escapeHtml(teamName(x.real_team_id))}</b></div><strong>${x.result==='win'?'🟢 Victòria':'🔴 Derrota'}</strong></div>`).join(''):'<div class="empty-state"><div class="empty-icon">🏀</div><h3>Encara no hi ha resultats</h3></div>';}).catch(e=>{$('resultsList').innerHTML=`<div class="empty-state">No s'han pogut carregar els resultats.<br><small>${escapeHtml(e.message)}</small></div>`;});
 }
 document.querySelectorAll('.rk-tab').forEach(t=>t.addEventListener('click',()=>{
-  const teams=t.dataset.rk==='teams';
+  const v=t.dataset.rk;
   document.querySelectorAll('.rk-tab').forEach(x=>x.classList.toggle('active',x===t));
-  $('rkFantasy').style.display=teams?'none':''; $('rkTeams').style.display=teams?'':'none';
-  $('rkSub').textContent=teams?'Quants partits han anat a veure les persones de cada equip del club.':'Punts acumulats de tots els equips Fantasy.';
-  if(teams) renderTeamAtt();
+  $('rkFantasy').style.display=v==='fantasy'?'':'none'; $('rkTeams').style.display=v==='teams'?'':'none'; if($('rkLeagues')) $('rkLeagues').style.display=v==='leagues'?'':'none';
+  $('rkSub').textContent=({fantasy:'Punts acumulats de tots els equips Fantasy.',teams:'Quants partits han anat a veure les persones de cada equip del club.',leagues:'Classificacions privades per jugar amb la família i els amics.'})[v]||'';
+  if(v==='teams') renderTeamAtt(); if(v==='leagues') loadLeagues();
 }));
 async function renderTeamAtt(){
   const box=$('teamAttList'); if(!box) return;
@@ -379,7 +380,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); initBot(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); initBot(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -742,6 +743,7 @@ $('renameTeam').onclick=async()=>{
 /* ===== CONSELLS AUTOMÀTICS ===== */
 const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
 const TIPS=[
+"Crea una lliga privada amb la família o els amics a Classificació → 👥 Lligues.",
 "Tens algun dubte? Toca el botó 💬 Ajuda de dalt a la dreta i l’assistent te’l resol.",
 "Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
 "Una plantilla completa té 8 jugadors i 2 entrenadors.",
@@ -1231,6 +1233,12 @@ const BOT_KB=[
  a:`A <b>Classificació</b> veus tots els equips Fantasy ordenats per punts. La teva fila porta l'etiqueta <b>TU</b> i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers. Hi ha dues pestanyes: <b>🏆 Fantasy</b> i <b>🏟️ Afició per equips</b>.`,go:'ranking'},
 {c:'rank',q:'Què és la classificació d\'afició per equips?',k:'aficio per equips, afició, aficion, equip amb mes aficio, assistencia per equip, quin equip te mes gent, fans',
  a:`És el rànquing dels <b>equips reals del club</b> segons quants partits han anat a veure les persones que els han triat en escanejar el QR. Es veu a <b>Classificació → 🏟️ Afició per equips</b>, i la posició de cada equip també surt a la pestanya <b>Equips</b>.`,go:'ranking'},
+{c:'rank',q:'Què són les lligues privades?',k:'lligues, ligas, lliga privada, liga privada, grup, grupo, amics classificacio, familia, classificacio privada, league, competir amb amics',
+ a:`Una <b>lliga privada</b> és una classificació només per al teu grup (la família, els amics, l'equip…). Els punts són els mateixos que a la classificació general; només canvia amb qui et compares. Les trobes a <b>Classificació → 👥 Lligues</b>.`,go:'ranking'},
+{c:'rank',q:'Com creo una lliga o m\'hi uneixo?',k:'crear lliga, crear liga, unir me, unirme, unir-me lliga, codi lliga, codigo liga, convidar lliga, entrar lliga, nova lliga',
+ a:`A <b>Classificació → 👥 Lligues</b>: escriu un nom i prem <b>Crear</b> (et donarà un codi de 6 lletres), o escriu el codi que t'hagin passat i prem <b>Unir-me</b>. També pots tocar <b>Convidar</b> per compartir un enllaç que t'hi uneix directament.`,go:'ranking'},
+{c:'rank',q:'Quanta gent pot haver-hi a una lliga? Qui la veu?',k:'quanta gent lliga, maxim lliga, cinc lligues, 30 persones, privacitat lliga, qui veu la lliga, treure algu lliga, sortir lliga, esborrar lliga, limit lligues',
+ a:`Fins a <b>30 persones</b> per lliga i <b>5 lligues</b> per persona. Només la veuen els que hi són (cal el codi per entrar). Qui l'ha creat pot <b>treure participants</b> o <b>esborrar-la</b>, i qualsevol pot <b>sortir-ne</b> quan vulgui.`,go:'ranking'},
 {c:'rank',q:'Hi ha premis?',k:'premi, premio, premios, regal, guanyador, ganador, que es guanya, recompensa, trofeu',
  a:`Els premis (si n'hi ha) els decideix l'<b>organitzador del club</b>. Pregunta-li directament o mira els avisos del club.`},
 {c:'rank',q:'On veig els resultats reals dels partits?',k:'resultats, resultados, marcador, marcadors, resultat, com ha quedat, quant han quedat, score',
@@ -1418,7 +1426,58 @@ function initBot(){
 }
 /*BOT-UI-END*/
 
-const APP_VERSION=64; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+/* ===== LLIGUES PRIVADES ===== */
+async function lgCall(fn,args){ const r=await rpc(fn,args||{}), t=await r.text(); if(!r.ok){ let m=t; try{ m=JSON.parse(t).message||t; }catch{} throw new Error(String(m).slice(0,200)); } return t?JSON.parse(t):null; }
+function lgLink(code){ return `${location.origin}${location.pathname.replace(/index\.html$/,'')}#lliga=${code}`; }
+async function lgShare(name,code){ const text=`Uneix-te a la meva lliga “${name}” al Fantasy del Club Bàsquet Alella! Codi: ${code}`; try{ if(navigator.share) await navigator.share({title:'Fantasy Bàsquet Alella',text,url:lgLink(code)}); else { await navigator.clipboard.writeText(text+' '+lgLink(code)); alert('Enllaç copiat!'); } }catch{} }
+async function loadLeagues(){
+  const box=$('leagueBox'); if(!box) return;
+  try{ state.leagues=await lgCall('get_my_leagues'); }
+  catch(e){ box.innerHTML=`<p class="st-empty">No s’han pogut carregar les lligues.<br><small>${escapeHtml(e.message)}</small></p>`; return; }
+  renderLeagues();
+}
+function renderLeagues(){
+  const box=$('leagueBox'); if(!box) return; const L=state.leagues||[];
+  const list=L.length?L.map(l=>`<div class="lg-item${state.lgOpen===l.id?' open':''}" data-lg="${l.id}"><button type="button" class="lg-head" data-lgtoggle="${l.id}"><span class="lg-name">${escapeHtml(l.name)}${l.is_owner?' <small>👑</small>':''}</span><span class="lg-meta">👥 ${l.members} · ${l.my_pos?('#'+l.my_pos):'—'}</span></button><div class="lg-detail" id="lgDetail${l.id}"></div></div>`).join(''):`<p class="lg-empty">Encara no ets a cap lliga. Crea’n una per jugar amb la família o els amics, o escriu el codi que t’hagin passat.</p>`;
+  box.innerHTML=`<p class="lg-intro">Una lliga privada és una classificació només per al teu grup. Els punts són els mateixos que a la classificació general. Màxim 5 lligues per persona i 30 participants per lliga.</p>${list}<div class="lg-forms"><div class="lg-row"><input id="lgName" maxlength="30" placeholder="Nom de la nova lliga"><button type="button" class="primary" id="lgCreate">Crear</button></div><div class="lg-row"><input id="lgCode" maxlength="10" placeholder="Codi d’una lliga" autocapitalize="characters" autocomplete="off"><button type="button" class="secondary" id="lgJoin">Unir-me</button></div></div>`;
+  if(state.lgOpen) openLeague(state.lgOpen,true);
+}
+async function openLeague(id,keep){
+  const det=$('lgDetail'+id); if(!det) return;
+  if(!keep&&state.lgOpen===id){ state.lgOpen=null; document.querySelectorAll('.lg-item').forEach(x=>x.classList.remove('open')); det.innerHTML=''; return; }
+  state.lgOpen=id;
+  document.querySelectorAll('.lg-item').forEach(x=>x.classList.toggle('open',x.dataset.lg===String(id)));
+  document.querySelectorAll('.lg-detail').forEach(x=>{ if(x!==det) x.innerHTML=''; });
+  det.innerHTML='<p class="st-empty">Carregant…</p>';
+  try{
+    const d=await lgCall('get_league_ranking',{p_league:id}), lg=d.league, rows=d.rows||[], fmt=v=>Number(v||0).toFixed(1).replace('.',',');
+    det.innerHTML=`<div class="lg-code">Codi per convidar: <b>${escapeHtml(lg.code)}</b></div><div class="ranking-list">${rows.map(x=>`<div class="ranking-row${x.pos<=3?' top'+x.pos:''}${x.is_me?' mine':''}"><span class="ranking-pos">${['🥇','🥈','🥉'][x.pos-1]||x.pos}</span><div class="ranking-name"><b>${escapeHtml(x.team_name)}</b>${x.is_me?'<span class="me-badge">TU</span>':''}${x.is_owner?'<small>👑 creador/a</small>':''}</div><strong>${fmt(x.total_points)} pts</strong>${lg.is_owner&&!x.is_me?`<button type="button" class="lg-x" data-lgrm="${x.fantasy_team_id}" data-lgid="${id}" aria-label="Treure de la lliga">✕</button>`:''}</div>`).join('')}</div><div class="lg-actions"><button type="button" class="primary" data-lgshare="${id}">📤 Convidar</button><button type="button" class="secondary" data-lgcopy="${id}">Copiar codi</button><button type="button" class="secondary" data-lgleave="${id}">Sortir</button>${lg.is_owner?`<button type="button" class="secondary danger" data-lgdel="${id}">Esborrar lliga</button>`:''}</div>`;
+  }catch(e){ det.innerHTML=`<p class="st-empty">No s’ha pogut carregar.<br><small>${escapeHtml(e.message)}</small></p>`; }
+}
+document.addEventListener('click',async e=>{
+  const box=$('leagueBox'); const t=e.target.closest('[data-lgtoggle],[data-lgshare],[data-lgcopy],[data-lgleave],[data-lgdel],[data-lgrm],#lgCreate,#lgJoin');
+  if(!t||!box||!box.contains(t)) return;
+  const find=id=>(state.leagues||[]).find(l=>String(l.id)===String(id));
+  try{
+    if(t.dataset.lgtoggle){ openLeague(Number(t.dataset.lgtoggle)); }
+    else if(t.dataset.lgshare){ const l=find(t.dataset.lgshare); if(l) lgShare(l.name,l.code); }
+    else if(t.dataset.lgcopy){ const l=find(t.dataset.lgcopy); if(l){ try{ await navigator.clipboard.writeText(l.code); alert('Codi copiat: '+l.code); }catch{ prompt('Codi de la lliga:',l.code); } } }
+    else if(t.dataset.lgleave){ const l=find(t.dataset.lgleave); if(l&&confirm(`Vols sortir de la lliga “${l.name}”?`)){ await lgCall('leave_league',{p_league:l.id}); state.lgOpen=null; await loadLeagues(); } }
+    else if(t.dataset.lgdel){ const l=find(t.dataset.lgdel); if(l&&confirm(`Esborrar la lliga “${l.name}” per a tothom? No es pot desfer.`)){ await lgCall('delete_league',{p_league:l.id}); state.lgOpen=null; await loadLeagues(); } }
+    else if(t.dataset.lgrm){ if(confirm('Vols treure aquesta persona de la lliga?')){ await lgCall('remove_league_member',{p_league:Number(t.dataset.lgid),p_fantasy_team:Number(t.dataset.lgrm)}); await loadLeagues(); } }
+    else if(t.id==='lgCreate'){ const n=($('lgName').value||'').trim(); if(n.length<3) return alert('Escriu un nom d’entre 3 i 30 lletres.'); t.disabled=true; try{ const d=await lgCall('create_league',{p_name:n}); state.lgOpen=d.id; await loadLeagues(); confetti(); alert(`🎉 Lliga creada! El codi és ${d.code}. Toca “Convidar” per compartir-lo.`); } finally{ t.disabled=false; } }
+    else if(t.id==='lgJoin'){ const c=($('lgCode').value||'').trim(); if(!c) return alert('Escriu el codi de la lliga.'); t.disabled=true; try{ const d=await lgCall('join_league',{p_code:c}); state.lgOpen=d.id; await loadLeagues(); alert(`👥 T’has unit a la lliga “${d.name}”!`); } finally{ t.disabled=false; } }
+  }catch(err){ alert('⚠️ '+(err.message||err)); }
+});
+(function(){ const m=location.hash.match(/lliga=([A-Za-z0-9]{4,10})/); if(m){ try{ localStorage.setItem('lgCode',m[1].toUpperCase()); }catch{} history.replaceState(null,'',location.pathname+location.search); } })();
+async function redeemLeague(){
+  let c=null; try{ c=localStorage.getItem('lgCode'); }catch{} if(!c) return;
+  try{ localStorage.removeItem('lgCode'); }catch{}
+  try{ const d=await lgCall('join_league',{p_code:c}); state.lgOpen=d.id; showSection('ranking'); const tb=document.querySelector('.rk-tab[data-rk="leagues"]'); if(tb) tb.click(); confetti(); alert(`👥 T’has unit a la lliga “${d.name}”!`); }
+  catch(err){ alert('⚠️ No m’he pogut unir a la lliga: '+(err.message||err)); }
+}
+
+const APP_VERSION=65; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
