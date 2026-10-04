@@ -409,16 +409,40 @@ async function saveAdminResults(){
 }
 async function processCurrentRound(){
   if(!state.admin||!state.round)return;
+  let rid=state.round.id, rnum=state.round.round_number, other=false;
+  // Si la jornada activa no té resultats però una jornada anterior sí i encara no està processada, ofereix processar aquella
+  try{
+    const rr=await api(`team_round_results?round_id=eq.${rid}&select=real_team_id`); const has=rr.ok?(await rr.json()).length:0;
+    if(!has){
+      const lr=await api('fantasy_rounds?select=id,round_number&order=round_number.desc'); const rounds=lr.ok?await lr.json():[];
+      for(const x of rounds){
+        if(x.id===rid||x.round_number>rnum) continue;
+        const [ra,rb]=await Promise.all([api(`team_round_results?round_id=eq.${x.id}&select=real_team_id`),api(`player_round_history?round_id=eq.${x.id}&select=player_id&limit=1`)]);
+        const res=ra.ok?(await ra.json()).length:0, done=rb.ok?(await rb.json()).length:0;
+        if(res>0&&!done){
+          if(!confirm(`La jornada activa (${rnum}) encara no té resultats, però la jornada ${x.round_number} té ${res} resultats i NO està processada.\n\nVols processar la jornada ${x.round_number}?`)) return;
+          rid=x.id; rnum=x.round_number; other=true;
+        }
+        break;
+      }
+    }
+  }catch{}
+  const histCount=async()=>{ let n=0; for(const q of [`player_round_history?round_id=eq.${rid}&select=player_id`,`coach_round_history?round_id=eq.${rid}&select=coach_id`]){ try{ const r=await api(q); if(r.ok) n+=(await r.json()).length; }catch{} } return n; };
+  const before=await histCount();
+  if(before>0&&!confirm('ℹ️ Aquesta jornada ja té punts calculats ('+before+' registres). Processar-la un altre cop NO canviarà els que ja hi són; només hi afegirà els que faltin.\n\nSi has corregit resultats o destacats i vols recalcular-ho tot, cancel·la, prem “Retrocedir última jornada” i processa-la de nou.\n\nVols continuar igualment?'))return;
   if(!confirm('Processar aquesta jornada? Es calcularan punts i valors a partir dels resultats i dels jugadors destacats.'))return;
-  const chk=await checkRound();
+  const chk=other?null:await checkRound();
   if(chk&&(chk.missRes.length||chk.missHl.length)&&!confirm('⚠️ Falten dades:\n'+(chk.missRes.length?'• Resultats: '+chk.missRes.join(', ')+'\n':'')+(chk.missHl.length?'• Destacats: '+chk.missHl.join(', ')+'\n':'')+'\nSegur que vols processar igualment?')) return;
   if(!(await backupNow())&&!confirm('No s’ha pogut fer la còpia de seguretat. Processar igualment?')) return;
   try{
-    const p=await rpc('process_fantasy_round',{p_round_id:state.round.id});
+    const p=await rpc('process_fantasy_round',{p_round_id:rid});
     if(!p.ok) throw new Error((await p.text()).replace(/^"|"$/g,''));
-    const c=await rpc('process_coach_round',{p_round_id:state.round.id});
+    const c=await rpc('process_coach_round',{p_round_id:rid});
     if(!c.ok) throw new Error((await c.text()).replace(/^"|"$/g,''));
-    await loadData(); await loadAdminData(); setAdminMessage('Jornada processada correctament.'); confetti();
+    const after=await histCount();
+    await loadData(); await loadAdminData();
+    if(after<=before){ setAdminMessage('⚠️ No s’ha canviat res: no hi havia res nou per processar. O bé la jornada ja estava processada, o bé no hi ha resultats desats per a cap equip. Per recalcular-la: “Retrocedir última jornada” i torna a processar.'); }
+    else { setAdminMessage('Jornada '+rnum+' processada correctament ('+(after-before)+' registres nous).'); confetti(); }
   }catch(e){setAdminMessage(`Error: ${e.message}`);}
 }
 
@@ -1537,7 +1561,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=66; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=68; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
