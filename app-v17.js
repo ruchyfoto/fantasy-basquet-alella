@@ -568,7 +568,7 @@ function renderMarketBanner(){
   const el=$('marketBanner'); if(!el) return;
   const m=state.market, closed=marketClosed();
   document.body.classList.toggle('market-closed',closed);
-  if(closed){ el.className='market-banner closed'; el.innerHTML='<span class="lock">🔒</span> <b>Mercat tancat.</b> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada dijous a les 23:59 (el divendres hi ha partit) perquè ningú faci moviments un cop coneguts els resultats reals.'; }
+  if(closed){ el.className='market-banner closed'; el.innerHTML='<span class="lock">🔒</span> <b>Mercat tancat.</b><span class="mb-short"> Torna a obrir amb la propera jornada.</span><span class="mb-more"> No es poden fer fitxatges, vendes ni canvis de capità fins que comenci la propera jornada. El mercat tanca cada dijous a les 23:59 (el divendres hi ha partit) perquè ningú faci moviments un cop coneguts els resultats reals.</span>'; }
   else if(m&&m.closes_at){ const t=new Date(m.closes_at), h=(t-new Date())/36e5; el.className='market-banner'+(h<24?' soon':''); el.innerHTML=`${h<24?'⏳':'🟢'} <b>Mercat obert</b> fins al ${fmtData(t)}.<br>⏱️ El mercat es tancarà en <b id="mkCount"></b>`; tickMarket(); }
   else { el.className='market-banner'; el.innerHTML='🟢 <b>Mercat obert.</b>'; }
 }
@@ -1418,7 +1418,7 @@ function initBot(){
 }
 /*BOT-UI-END*/
 
-const APP_VERSION=63; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=64; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
