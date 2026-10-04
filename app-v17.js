@@ -78,6 +78,7 @@ async function login(){
 function logout(){
   _isClub=null;
   try{ pushDetach(); }catch(e){}
+  try{ botHide(); }catch(e){}
   state.session=null; state.teamId=null; state.team=null; state.username='';
   localStorage.removeItem('fantasySession');
   showAuth();
@@ -378,7 +379,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); initBot(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -655,7 +656,7 @@ const TOUR=[
  {i:'🛒',t:'El mercat',go:'market',h:`<p>Aquí fitxes jugadors i entrenadors. Canvia entre <b>Jugadors</b> i <b>Entrenadors</b> a dalt, i fes servir el cercador i el filtre d’equip.</p><ul><li>Prem <span class="demo">Fitxar · 10,0 M€</span> per fitxar. A la compra s’hi suma una <b>comissió del 5%</b>.</li><li>Toca la targeta (no el botó) per veure’n les <b>estadístiques</b>.</li><li>Cada targeta mostra el <b>valor</b> i els <b>punts</b> que porta.</li></ul>`},
  {i:'👕',t:'La teva plantilla',go:'team',h:`<p>És el teu equip: els <b>entrenadors a dalt</b> i els <b>8 jugadors</b> sobre la pista.</p><div class="tour-legend"><span class="demo">C</span><span>El <b>capità</b>: suma <b>+10 punts extra</b> al teu equip cada jornada que <b>guanya</b></span><span class="demo grey">☆ / ⭐</span><span>Fer capità aquest jugador</span><span class="demo grey">💸</span><span>Vendre’l: et retornen el valor actual, sense comissió</span><span class="demo grey">+</span><span>Lloc buit: et porta al mercat per fitxar-ne un</span></div><p>Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega.</p>`},
  {i:'📊',t:'Estadístiques',h:`<p>Toca qualsevol targeta de jugador o d’entrenador per obrir la seva fitxa:</p><ul><li>Punts totals, victòries, ratxa i valor.</li><li>Gràfica de l’<b>evolució del valor</b> i dels <b>punts per jornada</b>.</li><li>La <b>popularitat</b>: quants equips Fantasy el tenen.</li></ul><p>A <b>Equips</b> hi ha tots els integrants de cada equip real, amb els partits guanyats i la popularitat.</p>`},
- {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugador destacat</b>: <b>+5 punts</b> extra, encara que l’equip perdi. El tria l’entrenador del seu equip després del partit.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
+ {i:'⭐',t:'Com es guanyen punts',go:'rules',h:`<ul><li><b>Victòria</b> del seu equip: <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria seguida suma 1 punt més: és la <b>ratxa</b> 🔥.</li><li><b>Jugadors destacats</b>: l’entrenador n’escull fins a 3 per ordre després del partit: <b>+7, +5 i +3 punts</b> extra, encara que l’equip perdi.</li><li><b>Entrenadors</b>: sumen punts quan el seu equip guanya, també amb bonus per ratxa.</li><li><b>Capità</b>: <b>+10 punts extra</b> a la teva classificació cada jornada en què el teu capità <b>guanya</b>.</li><li>Només compten els punts que genera cada jugador o entrenador <b>mentre és a la teva plantilla</b>.</li></ul><p>A més, el <b>valor</b> de jugadors i entrenadors canvia després de cada jornada segons els resultats.</p>`},
  {i:'🔒',t:'Normes del mercat',h:`<ul><li>Pressupost inicial: <b>120 M€</b>. Comprar té un <b>5% de comissió</b>; vendre, cap.</li><li>Màxim <b>8 jugadors</b> i <b>2 entrenadors</b>.</li><li>Màxim <b>1 jugador de cada equip real</b>, amb una excepció: <b>a partir del 5 d’octubre pots tenir-ne 2 del mateix equip</b>, però només d’un equip.</li><li>Màxim <b>2 fitxatges per jornada</b> (abans dels primers resultats, els que vulguis).</li><li>El mercat <b>tanca cada dijous a les 23:59</b> i no s’obre fins que comença la jornada següent. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.</li></ul>`},
  {i:'🏆',t:'Classificació i resultats',go:'ranking',h:`<ul><li>A <b>Classificació</b> veus tots els equips per punts. La teva fila porta l’etiqueta <span class="demo">TU</span>, i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers.</li><li>A <b>Resultats</b> tens els resultats reals de cada jornada.</li></ul>`},
  {i:'👀',t:'Vés a veure partits',go:'home',h:`<p>Si vens a veure un partit d’un altre equip del club, a l’<b>Inici</b> prem <span class="demo">📷 He vingut a veure un partit</span> i escaneja el <b>QR de la taula</b>: sumes <b>+3 punts</b>.</p><ul><li>A l’<b>Inici</b> veuràs el <b>calendari d’aquesta jornada</b>: tots els partits, a casa (🏠) i a fora (✈️), amb l’hora i l’estat. El QR només hi és als partits a casa. Els marcats amb <b>⭐ x2</b> donen el doble de punts.</li><li>Si vas a veure partits <b>setmanes seguides</b>, tens bonus: <b>+2</b> a la 3a setmana i <b>+5</b> a la 5a.</li><li>Completa les <b>missions</b> i convida amics amb el teu <b>codi</b> per sumar punts extra.</li><li>Només un cop per partit.</li><li>El QR canvia cada pocs segons: s’ha d’escanejar allà mateix.</li><li>Si fas taula en un partit, tens la pestanya <b>Taula</b> amb el QR del teu partit.</li></ul>`},
@@ -741,6 +742,7 @@ $('renameTeam').onclick=async()=>{
 /* ===== CONSELLS AUTOMÀTICS ===== */
 const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
 const TIPS=[
+"Tens algun dubte? Toca el botó 💬 Ajuda de baix a la dreta i l’assistent te’l resol.",
 "Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
 "Una plantilla completa té 8 jugadors i 2 entrenadors.",
 "Pots tenir 2 jugadors del mateix equip real, però només una vegada: la resta, d’equips diferents!",
@@ -1117,7 +1119,294 @@ if($('predBox')) $('predBox').addEventListener('click',async e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible') loadPredictions(); },300000);
 
-const APP_VERSION=59; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+/*BOT-ENGINE-START*/
+const BOT_CATS=[
+ {id:'basic',i:'🎮',t:'Començar'},
+ {id:'market',i:'🛒',t:'Mercat'},
+ {id:'team',i:'👕',t:'Plantilla'},
+ {id:'points',i:'⭐',t:'Punts'},
+ {id:'extra',i:'🎯',t:'Punts extra'},
+ {id:'rank',i:'🏆',t:'Classificació'},
+ {id:'club',i:'🏟️',t:'Partits i taula'},
+ {id:'app',i:'📱',t:'App i avisos'},
+ {id:'help',i:'🛠️',t:'Problemes'}
+];
+
+// c = categoria · q = pregunta · k = paraules clau (català i castellà) · a = resposta · go = pestanya on portar-te · d = línia dinàmica
+const BOT_KB=[
+/* ---------- COMENÇAR ---------- */
+{c:'basic',q:'Què és el Fantasy Bàsquet Alella?',k:'fantasy, que es el fantasy, joc, de que va, explicacio, juego, en que consisteix, objectiu, objetivo',
+ a:`És un joc per als socis i les famílies del club. Fitxes <b>jugadors i entrenadors reals</b> del Club Bàsquet Alella i, quan els seus equips <b>guanyen</b>, el teu equip Fantasy suma punts. Qui en té més a la classificació, guanya.`,go:'rules'},
+{c:'basic',q:'Com començo a jugar?',k:'comencar, començar, primers passos, empezar, como juego, com es juga, instruccions, guia, tutorial',
+ a:`<ol><li>Ves al <b>Mercat</b> i fitxa fins a <b>8 jugadors</b> i <b>2 entrenadors</b> amb els teus 120 M€.</li><li>A <b>Plantilla</b> tria el teu <b>capità</b> (⭐).</li><li>Mira els partits de la setmana a <b>Inici</b> i, si pots, ves a veure'ls: l'assistència també dona punts.</li><li>Cada jornada, els punts es calculen amb els resultats reals.</li></ol><p>Tens una guia pas a pas a <b>Regles → Veure la guia</b>.</p>`,go:'market'},
+{c:'basic',q:'Quants jugadors i entrenadors puc tenir?',k:'quants jugadors, plantilla maxima, 8 jugadors, 2 entrenadors, limit, cuantos jugadores, maximo',
+ a:`Pots tenir <b>8 jugadors</b> i <b>2 entrenadors</b>. No pots superar aquests límits, però no cal que ho completis tot el primer dia.`,go:'team'},
+{c:'basic',q:'Quin pressupost tinc?',k:'pressupost, presupuesto, diners, dinero, milions, 120, euros, budget, M€',
+ a:`Comences amb <b>120 M€</b>. Quan fitxes es resta el valor (més un 5% de comissió) i quan vens se't retorna el valor actual. El teu pressupost disponible el veus a la targeta taronja de l'<b>Inici</b>.`,go:'home'},
+{c:'basic',q:'Què és una jornada?',k:'jornada, que es una jornada, ronda, semana, setmana, round',
+ a:`Una <b>jornada</b> és el període de partits d'una setmana (amb un partit també els divendres). Quan acaba, l'organitzador introdueix els resultats i <b>processa la jornada</b>: és llavors quan se sumen els punts i canvien els valors.`},
+{c:'basic',q:'Com em registro o entro a l\'app?',k:'registrar, registro, crear compte, cuenta, entrar, login, iniciar sessio, correu, email, alta, usuari',
+ a:`A la pantalla d'entrada tria <b>crear compte</b> amb el teu correu i una contrasenya. Després, entra amb aquest mateix correu. Només cal fer-ho una vegada: l'app et recorda al mateix dispositiu.`},
+{c:'basic',q:'He oblidat la contrasenya',k:'contrasenya, contraseña, password, oblidat, olvidado, recuperar, no puc entrar, no puedo entrar, canviar contrasenya',
+ a:`Si a la pantalla d'entrada hi ha l'opció de recuperar-la, fes-la servir i t'arribarà un correu. Si no et funciona, avisa l'organitzador del club perquè t'ho ajudi a resoldre.`},
+{c:'basic',q:'Puc tenir més d\'un equip Fantasy?',k:'dos equips, mes d un equip, varios equipos, segon compte, duplicar, multiple, otro equipo',
+ a:`Cada persona té <b>un únic equip Fantasy</b> amb el seu compte. Si algú de casa també vol jugar, que es creï el seu propi compte amb un altre correu.`},
+{c:'basic',q:'Puc canviar el nom del meu equip?',k:'nom equip, nombre equipo, canviar nom, renombrar, editar nom, cambiar nombre',
+ a:`Sí. A la pestanya <b>Plantilla</b> toca el llapis ✏️ al costat del nom de l'equip, escriu-ne un de nou i desa.`,go:'team'},
+
+/* ---------- MERCAT ---------- */
+{c:'market',q:'Com fitxo un jugador o un entrenador?',k:'fitxar, fichar, comprar, afegir, anadir, contractar, fitxatge, fichaje, com compro',
+ a:`Ves a <b>Mercat</b>, tria <b>Jugadors</b> o <b>Entrenadors</b> a dalt i prem <b>Fitxar</b> a la targeta. Pots fer servir el cercador i el filtre per equip. A la compra se suma una <b>comissió del 5%</b>.`,go:'market'},
+{c:'market',q:'Com venc un jugador?',k:'vendre, vender, vendes, treure, quitar, fora, deixar anar, liberar, vender jugador, 💸',
+ a:`A <b>Plantilla</b> prem el botó <b>💸</b> del jugador. Et retornen el <b>valor de mercat actual</b>, <b>sense cap comissió</b>. Recorda que amb el mercat tancat no es pot vendre.`,go:'team'},
+{c:'market',q:'Quina comissió hi ha?',k:'comissio, quina comissio, comissio comprar, comissio vendre, comision, 5%, cinc per cent, comissions, cobrar, cobren, fee',
+ a:`<b>Comprar</b> té un <b>5% de comissió</b>. <b>Vendre</b> no en té cap (0%).`},
+{c:'market',q:'Quants fitxatges puc fer per jornada?',k:'fitxatges jornada, maxim 2, dos fitxatges, limit fitxatges, cuantos fichajes, fichajes por jornada, quantes compres',
+ a:`Màxim <b>2 fitxatges per jornada</b>. Si ja n'has fet 2, no podràs fitxar fins a la jornada següent. Abans dels primers resultats no hi ha aquest límit.`},
+{c:'market',q:'Quan tanca i quan obre el mercat?',k:'mercat tanca, mercado cierra, tancament, cierre, dijous, jueves, divendres, viernes, horari, hora, obre, abre, oberts, obert, tancat, cerrado',
+ a:`El mercat <b>tanca cada dijous a les 23:59</b> (perquè els divendres ja hi ha partit) i <b>no s'obre fins que comença la jornada següent</b>. Així ningú fitxa sabent ja els resultats. Tancat, tampoc es pot vendre ni canviar el capità.`,
+ d:()=>{ try{ return marketClosed()?`<p>🔒 <b>Ara el mercat està tancat.</b></p>`:`<p>🟢 <b>Ara el mercat està obert</b> i tanca el ${nextThursday().toLocaleDateString('ca-ES',{weekday:'long',day:'numeric',month:'long'})} a les 23:59.</p>`; }catch(e){ return ''; } }},
+{c:'market',q:'Puc fitxar dos jugadors del mateix equip?',k:'mateix equip, mismo equipo, repetir equip, repetir, dos del mateix, equip real, un per equip, maxim per equip',
+ a:`Sí, amb una condició: pots tenir <b>2 jugadors del mateix equip real</b>, però això només es pot fer <b>amb un sol equip</b>. La resta d'equips, màxim 1 jugador cadascun.`,
+ d:()=>{ try{ return new Date()>=new Date('2026-10-05T00:00:00')?`<p>✅ Aquesta norma ja està activa.</p>`:`<p>📅 Entra en vigor <b>el 5 d'octubre</b>. Fins llavors, màxim 1 per equip.</p>`; }catch(e){ return ''; } }},
+{c:'market',q:'Per què no puc fitxar?',k:'no puc fitxar, no puedo fichar, error fitxar, no deixa, no deja, bloquejat, bloqueado, no es pot comprar, no funciona fitxar, rebutja',
+ a:`Comprova aquests motius, de més a menys habitual:<ul><li>🔒 El <b>mercat està tancat</b> (dijous 23:59 fins a la jornada següent).</li><li>💰 No tens prou <b>pressupost</b> (recorda la comissió del 5%).</li><li>👕 Ja tens <b>8 jugadors</b> (o 2 entrenadors).</li><li>🔁 Ja has fet els <b>2 fitxatges</b> d'aquesta jornada.</li><li>🏀 Ja tens un jugador d'aquell equip (només pots repetir equip una vegada).</li></ul>`},
+{c:'market',q:'Per què canvia el valor dels jugadors?',k:'valor, preu, precio, value, puja, baixa, sube, baja, canvi de valor, cotitzacio, valoracio',
+ a:`Després de <b>cada jornada</b> el valor de jugadors i entrenadors canvia segons els resultats del seu equip: les victories i les ratxes l'apugen. Així convé fitxar els que estan en forma abans que pugin.`},
+{c:'market',q:'Què és la popularitat?',k:'popularitat, popularidad, populars, quants equips el tenen, mes fitxats, mas fichados',
+ a:`La <b>popularitat</b> indica <b>quants equips Fantasy tenen</b> un jugador o entrenador. La veus a la seva fitxa (toca la targeta) i a la pestanya Equips.`,go:'clubs'},
+{c:'market',q:'Puc veure les estadístiques d\'un jugador?',k:'estadistiques, estadisticas, fitxa, grafica, historial, punts per jornada, evolucio, stats',
+ a:`Sí. Toca la <b>targeta</b> d'un jugador o entrenador (no el botó) i s'obre la seva fitxa: punts totals, victòries, ratxa, valor, gràfica d'evolució del valor i punts per jornada.`},
+
+/* ---------- PLANTILLA ---------- */
+{c:'team',q:'Què és el capità i com el trio?',k:'capita, capitan, captain, c, estrella, ⭐, triar capita, elegir capitan, +10',
+ a:`El <b>capità</b> és el teu jugador clau: cada jornada que el seu equip <b>guanya</b>, el teu equip rep <b>+10 punts extra</b>. Si perd, no hi ha extra. Per triar-lo, a <b>Plantilla</b> toca l'estrella ☆ d'un jugador. Només el pots canviar amb el <b>mercat obert</b>.`,go:'team'},
+{c:'team',q:'Puc canviar el capità en qualsevol moment?',k:'canviar capita, cambiar capitan, capita tancat, no puc canviar capita, capita bloquejat',
+ a:`Només mentre el <b>mercat està obert</b>. Quan tanca (dijous 23:59) el capità queda fixat fins a la jornada següent.`},
+{c:'team',q:'Com ordeno la meva plantilla?',k:'ordenar, arrossegar, arrastrar, moure, mover, drag, posicions, posiciones, pista, alineacio',
+ a:`Pots <b>arrossegar</b> els jugadors per ordenar-los al teu gust. Al mòbil, mantén premuda la targeta un moment i arrossega. L'ordre és només visual i no afecta els punts.`,go:'team'},
+{c:'team',q:'Què vol dir el + de la plantilla?',k:'lloc buit, hueco, mes, afegir, plus, casella buida, slot',
+ a:`És un <b>lloc buit</b>. Si hi toques, et porta al mercat per fitxar-hi algú.`,go:'market'},
+{c:'team',q:'Quins punts em compten: els d\'abans de fitxar-lo?',k:'punts abans, mentre es a la plantilla, desde que lo ficho, historic, retroactiu, antes de fichar, compten punts',
+ a:`Només compten els punts que genera un jugador o entrenador <b>mentre és a la teva plantilla</b>. Els d'abans de fitxar-lo, o després de vendre'l, no.`},
+{c:'team',q:'Els entrenadors també sumen punts?',k:'entrenadors punts, entrenador suma, coach, puntuen, entrenadores',
+ a:`Sí. Els <b>entrenadors</b> sumen punts quan el seu equip <b>guanya</b>, amb el bonus de ratxa igual que els jugadors. També tenen un valor que canvia cada jornada.`},
+
+/* ---------- PUNTS ---------- */
+{c:'points',q:'Com es guanyen punts?',k:'punts, puntos, com sumo, sumar, puntuacio, puntuacion, guanyar punts, ganar puntos, sistema de punts, resum',
+ a:`<ul><li>🏀 <b>Victòria</b> del seu equip: a partir de 12 punts (amb ratxa, més).</li><li>⭐ <b>Destacats</b> de l'entrenador: +7 / +5 / +3.</li><li>🅒 <b>Capità</b>: +10 si el seu equip guanya.</li><li>👀 <b>Anar a veure un partit</b>: +3 (el doble en partits x2).</li><li>🎯 <b>Missions, ratxa d'assistència, pronòstics i amics</b>: punts extra.</li></ul>`,go:'rules'},
+{c:'points',q:'Quants punts val una victòria?',k:'victoria, victoria punts, guanya, gana, win, 12 punts, 10 punts, valor victoria, quants punts per guanyar',
+ a:`Una victòria val <b>12 punts</b> la primera, <b>13</b> la segona seguida, <b>14</b> la tercera… Cada victòria consecutiva suma 1 punt més: és la <b>ratxa</b> 🔥. Si l'equip perd, no suma per victòria i la ratxa es reinicia.`},
+{c:'points',q:'Què és la ratxa?',k:'ratxa, racha, victories seguides, consecutives, streak, seguides, 🔥',
+ a:`La <b>ratxa</b> 🔥 compta les victòries <b>seguides</b> d'un equip. Cada victòria consecutiva puja en 1 punt el que val guanyar (12, 13, 14…). Perdre la reinicia a zero.`},
+{c:'points',q:'Què són els jugadors destacats?',k:'destacat, destacats, destacado, destacados, highlight, 7 5 3, tres destacats, mvp, millor jugador, 7 punts, 5 punts, 3 punts, primer segon tercer',
+ a:`Després del partit, l'<b>entrenador</b> de cada equip tria fins a <b>3 jugadors destacats, ordenats per importància</b>: el 1r rep <b>+7 punts</b>, el 2n <b>+5</b> i el 3r <b>+3</b>. Els reben encara que l'equip perdi. Sumen al jugador i, per tant, als equips Fantasy que el tinguin.`},
+{c:'points',q:'Hi ha punts negatius?',k:'negatius, negativos, restar, perdre punts, perder puntos, baixar punts, penalitzacio, penalizacion, menys punts',
+ a:`<b>No.</b> Els punts només sumen, mai resten. El que sí que pot baixar és el <b>valor</b> d'un jugador o entrenador si el seu equip perd.`},
+{c:'points',q:'Quan se sumen els punts?',k:'quan, cuando, actualitzar punts, actualizar, processar jornada, processada, se sumen, no veig punts, tarden, retard, aparece',
+ a:`Els punts no es veuen al moment: se sumen quan <b>l'organitzador processa la jornada</b>, després d'introduir tots els resultats reals i els destacats dels entrenadors. Fins llavors, la classificació no es mou.`},
+{c:'points',q:'Per què no he sumat punts?',k:'no he sumat, no me han sumado, zero punts, cero puntos, per que no, por que no, falten punts, punts incorrectes, error punts, no compta',
+ a:`Possibles motius:<ul><li>⏳ La jornada <b>encara no s'ha processat</b>.</li><li>🏀 El seu equip <b>va perdre</b> (no hi ha punts de victòria).</li><li>🔒 El jugador <b>no era a la teva plantilla</b> quan es va tancar la jornada.</li><li>🧑‍🏫 Els destacats encara no els havia triat l'entrenador.</li></ul><p>Si creus que hi ha un error, digues-ho a l'organitzador amb el nom del jugador i la jornada.</p>`},
+{c:'points',q:'Per què el meu jugador té punts però jo no?',k:'jugador te punts, el jugador suma, no suma a mi, punts jugador, punts equip fantasy diferencia',
+ a:`Els punts d'un jugador són els que genera <b>ell</b>. Tu només en cobres els que va fer <b>mentre era a la teva plantilla</b>. Si el vas fitxar després, no compten.`},
+
+/* ---------- PUNTS EXTRA ---------- */
+{c:'extra',q:'Com sumo punts anant a veure partits?',k:'assistencia, asistencia, anar a veure, ir a ver, partit vist, escanejar, escanear, qr, +3, afició, aficio, veure partit',
+ a:`A cada partit, la persona de la <b>taula</b> mostra un <b>QR</b>. Escaneja'l des de l'app: primer <b>tries de quin equip del club ets aficionat</b> en aquell partit i després el codi. Cada partit vist val <b>+3 punts</b>.`,go:'home'},
+{c:'extra',q:'Què són els partits x2?',k:'x2, doble, doble de punts, partits dobles, partit x2, ⭐ x2, double, punts dobles',
+ a:`Alguns partits (marcats amb <b>⭐ x2</b> al calendari de l'Inici) fan que els punts d'assistència valguin el <b>doble</b>: <b>+6</b> en comptes de +3.`,go:'home'},
+{c:'extra',q:'Què és la ratxa d\'assistència?',k:'ratxa assistencia, racha asistencia, setmanes seguides, semanas seguidas, anar cada setmana, constancia, bonus assistencia',
+ a:`Si vas a veure com a mínim un partit <b>setmanes seguides</b> (només compten setmanes amb partits al club), guanyes un bonus: <b>+2</b> a la 3a setmana seguida i <b>+5</b> a la 5a. A Inici veus quina ratxa portes.`,go:'home'},
+{c:'extra',q:'Com funcionen les missions setmanals?',k:'missions, misiones, mision, repte, reto, tasques, objectius setmanals, mission',
+ a:`Cada setmana et proposem <b>3 missions diferents</b> (veure partits, fitxar, triar capità, tenir la plantilla completa…). Cada una val entre <b>1 i 3 punts</b> i es completa sola quan la fas. Les missions <b>canvien cada setmana</b>.`,go:'home'},
+{c:'extra',q:'Com convido un amic i quant val?',k:'convidar, invitar, amic, amigo, referral, codi, codigo, convida, convit, referit, portar gent',
+ a:`A Inici tens la teva <b>targeta de convidar</b> amb un codi personal. Quan un amic es registra i l'escriu, <b>tots dos guanyeu +5 punts</b>. Pots convidar fins a <b>10 amics</b>.`,go:'home'},
+{c:'extra',q:'Què són els pronòstics?',k:'pronostic, pronostico, pronostics, predir, predecir, endevinar, adivinar, predictions, apostes, guanyara perdra, 🔮',
+ a:`Cada jornada pots <b>pronosticar</b> fins a <b>5 equips</b> del club: marques si guanyaran o perdran. <b>+2 punts per encert</b> i <b>+3 de plenari</b> si n'encertes tots (amb 3 o més pronòstics). Es tanquen amb el mercat (dijous 23:59) i després es veuen els percentatges de tothom.`,go:'home'},
+{c:'extra',q:'Com guanyo més punts? Quines opcions tinc?',k:'mes punts, mas puntos, trucs, consells, estrategia, estrategias, ajuda guanyar, millorar, remuntar, com guanyar el fantasy, tips',
+ a:`Combina-ho tot:<ul><li>🏀 Fitxa jugadors d'equips en <b>ratxa</b>.</li><li>🅒 Posa de capità algú d'un equip fort.</li><li>👀 Ves a veure partits (sobretot els <b>x2</b>) i mantén la ratxa d'assistència.</li><li>🎯 Completa les 3 missions de la setmana.</li><li>🔮 Fes els pronòstics abans del dijous.</li><li>🤝 Convida amics (+5 cadascú).</li></ul>`},
+
+/* ---------- CLASSIFICACIÓ ---------- */
+{c:'rank',q:'Com funciona la classificació?',k:'classificacio, clasificacion, ranking, posicio, posicion, qui va primer, tabla, taula classificacio, puntuacions, lloc',
+ a:`A <b>Classificació</b> veus tots els equips Fantasy ordenats per punts. La teva fila porta l'etiqueta <b>TU</b> i a dalt hi ha la teva posició. 🥇🥈🥉 són els tres primers. Hi ha dues pestanyes: <b>🏆 Fantasy</b> i <b>🏟️ Afició per equips</b>.`,go:'ranking'},
+{c:'rank',q:'Què és la classificació d\'afició per equips?',k:'aficio per equips, afició, aficion, equip amb mes aficio, assistencia per equip, quin equip te mes gent, fans',
+ a:`És el rànquing dels <b>equips reals del club</b> segons quants partits han anat a veure les persones que els han triat en escanejar el QR. Es veu a <b>Classificació → 🏟️ Afició per equips</b>, i la posició de cada equip també surt a la pestanya <b>Equips</b>.`,go:'ranking'},
+{c:'rank',q:'Hi ha premis?',k:'premi, premio, premios, regal, guanyador, ganador, que es guanya, recompensa, trofeu',
+ a:`Els premis (si n'hi ha) els decideix l'<b>organitzador del club</b>. Pregunta-li directament o mira els avisos del club.`},
+{c:'rank',q:'On veig els resultats reals dels partits?',k:'resultats, resultados, marcador, marcadors, resultat, com ha quedat, quant han quedat, score',
+ a:`A la pestanya <b>Resultats</b> hi ha els resultats reals de cada jornada. També els veus a l'<b>Inici</b>, al calendari de la setmana.`,go:'results'},
+{c:'rank',q:'On veig els equips reals i els seus jugadors?',k:'equips, equipos, equips reals, club, jugadors del club, plantilles reals, entrenadors del club, categories',
+ a:`A la pestanya <b>Equips</b> hi ha els equips del club amb els seus integrants i entrenadors, els partits guanyats, la popularitat i la posició a la classificació d'afició.`,go:'clubs'},
+
+/* ---------- PARTITS I TAULA ---------- */
+{c:'club',q:'Què surt al calendari de l\'Inici?',k:'calendari, calendario, partits setmana, partidos semana, inici, home, agenda, proxims partits, proximos partidos, casa, fora, visitant, local',
+ a:`Al tauler d'<b>Inici</b> hi ha els partits de la setmana, tant els de <b>casa 🏠</b> com els de <b>fora ✈️</b>. Cada partit mostra el seu estat, i els marcats amb <b>⭐ x2</b> donen el doble de punts d'assistència.`,go:'home'},
+{c:'club',q:'Què vol dir en joc, acabat, suspès o anul·lat?',k:'estat partit, estado partido, en joc, en juego, acabat, terminado, suspes, suspendido, anullat, cancelado, aplazado, badges, etiquetes',
+ a:`Són els estats d'un partit:<ul><li>🔴 <b>En joc</b>: s'està disputant.</li><li><b>Acabat</b>: el partit ja ha acabat.</li><li>⏸️ <b>Suspès</b>: s'ha interromput.</li><li>❌ <b>Anul·lat</b>: no es juga, i no compta per als pronòstics.</li></ul><p>Normalment es calculen sols segons l'hora del partit, i l'administrador els pot canviar si passa alguna cosa extraordinària.</p>`},
+{c:'club',q:'Soc entrenador: com destaco jugadors?',k:'entrenador destacar, destacar jugadors, panell entrenador, panel entrenador, soc entrenador, triar destacats, coach panel, escollir destacats',
+ a:`Si el teu compte està vinculat com a entrenador, a la pestanya <b>📋 Taula</b> veuràs el <b>🧑‍🏫 Panell d'entrenador</b>. Quan ja hi ha el <b>resultat de l'equip</b>, tria fins a <b>3 jugadors per ordre d'importància</b> (7 / 5 / 3 punts) i desa. Es pot canviar fins que l'organitzador processi la jornada.`},
+{c:'club',q:'No em surt el panell d\'entrenador',k:'no surt panell, no veig panell entrenador, no aparece panel, falta panell, vincular entrenador, no soc vinculat',
+ a:`La pestanya Taula i el panell només apareixen si el teu compte està <b>vinculat a un entrenador</b> (o tens taula assignada). Si ho ets i no el veus, passa-li el teu correu a l'organitzador perquè et vinculi. Si has penjat una versió nova de l'app, recarrega la pàgina per actualitzar-la.`},
+{c:'club',q:'Com funciona el QR de la taula?',k:'taula, mesa, acta, mostrar qr, qr taula, generar qr, taula partit, fer taula, oficial de taula, codi qr',
+ a:`Si fas l'<b>acta</b> d'un partit, a la pestanya <b>Taula</b> hi surten els teus partits. Toca <b>Mostrar QR</b> i deixa que els assistents l'escanegin amb l'app. Cada partit té <b>2 llocs de taula</b>.`},
+{c:'club',q:'No puc escanejar el QR',k:'escanejar no funciona, no escaneja, no puc escanejar, camara, càmera, camera, permisos, qr no va, error qr, no lee qr',
+ a:`Prova això:<ul><li>📷 Dona <b>permís de càmera</b> a l'app o al navegador.</li><li>💡 Enfoca bé el QR amb prou llum, sense reflexos.</li><li>🏟️ Recorda <b>triar primer l'equip</b> del desplegable.</li><li>🔁 Cada partit només es pot comptar <b>una vegada</b>.</li><li>⏱️ El QR de la taula només és vàlid per a aquell partit.</li></ul>`},
+{c:'club',q:'Per què em demana triar un equip abans d\'escanejar?',k:'triar equip escanejar, desplegable, selector equip, quin equip, escollir equip qr, seleccionar equip',
+ a:`Perquè així sabem de quin equip ets aficionat aquell dia. Amb això es fa el rànquing <b>🏟️ Afició per equips</b>, que mostra quins equips del club tenen més gent animant-los.`},
+{c:'club',q:'Què és el compte "Basquet Alella"?',k:'basquet alella compte, compte club, usuari club, cuenta club, administrador club',
+ a:`És el compte oficial del club: no juga i no surt a la classificació. Serveix per gestionar el joc, ocupar sempre la taula dels partits i destacar jugadors de tots els equips.`},
+
+/* ---------- APP I AVISOS ---------- */
+{c:'app',q:'Com instal·lo l\'app al mòbil?',k:'instalar, instal·lar, app, aplicacio, descarregar, descargar, icona, icono, pantalla inici, afegir pantalla, android, iphone, ios, pwa',
+ a:`<b>Android (Chrome):</b> obre la web, prem el menú ⋮ i tria <i>Instal·la l'app</i> (o fes servir la targeta d'Instal·lar que surt a Inici).<br><b>iPhone (Safari):</b> prem <i>Compartir</i> ⬆️ i tria <i>Afegeix a pantalla d'inici</i>.<br>Quedarà amb la icona verda del club, com una app més.`,go:'home'},
+{c:'app',q:'Com activo les notificacions?',k:'notificacions, notificaciones, avisos, avisar, push, alertes, alertas, notificar, recordatori, recordatorio, activar avisos',
+ a:`A <b>Inici</b> hi ha la targeta de <b>notificacions</b>: prem <b>Activar</b> i accepta el permís. T'avisarem dels tancaments de mercat, resultats i altres novetats. Pots provar-ho amb el botó de prova.<br><b>Important a iPhone:</b> primer cal instal·lar l'app a la pantalla d'inici (iOS 16.4 o superior).`,go:'home'},
+{c:'app',q:'No m\'arriben les notificacions',k:'no arriben notificacions, no llegan notificaciones, no avisos, no rebo, sense notificacions, push no funciona, silenciat',
+ a:`Revisa:<ul><li>🔔 Que les hagis <b>activat</b> a la targeta d'Inici (un cop per dispositiu).</li><li>⚙️ Que el mòbil o el navegador tinguin els <b>permisos</b> de notificacions per a aquesta app.</li><li>📱 A iPhone, que l'app estigui <b>instal·lada a la pantalla d'inici</b>.</li><li>🌙 Que no tinguis el mode no molestar actiu.</li></ul>Prova el botó de <b>notificació de prova</b>.`},
+{c:'app',q:'On trobo la guia de com es juga?',k:'guia, tour, tutorial, ajuda, ayuda, com funciona tot, manual, explicacio, instruccions',
+ a:`A <b>Regles → ❓ Veure la guia</b> tens una guia pas a pas de tot el joc. A la pestanya Regles també hi ha un resum de totes les normes.`,go:'rules'},
+{c:'app',q:'Quines són totes les regles?',k:'regles, reglas, normes, normas, reglament, reglamento, resum regles, condicions',
+ a:`Resum:<ul><li>💰 120 M€ · 👕 8 jugadors + 🧑‍🏫 2 entrenadors.</li><li>🛒 Compra amb 5% de comissió; venda sense.</li><li>🔁 Màxim 2 fitxatges per jornada.</li><li>🏀 Màxim 1 jugador per equip real (2 d'un sol equip des del 5/10).</li><li>🔒 Mercat tancat de dijous 23:59 fins a la jornada següent.</li><li>⭐ Victòria + ratxa, destacats 7/5/3, capità +10, assistència +3.</li></ul>`,go:'rules'},
+{c:'app',q:'És segur? Quines dades guardeu?',k:'privacitat, privacidad, dades, datos, seguretat, seguridad, rgpd, proteccio dades, privat, menors, nens',
+ a:`Només es guarda el que cal per jugar: el teu correu, el nom del teu equip Fantasy i la teva activitat al joc (fitxatges, assistències, pronòstics). Per a qualsevol dubte sobre les teves dades, parla amb l'organitzador del club.`},
+
+/* ---------- PROBLEMES ---------- */
+{c:'help',q:'L\'app no es veu actualitzada o falta alguna cosa',k:'no s actualitza, no se actualiza, versio antiga, versión antigua, no surt, no apareix, no apareix res, falta, actualitzar, recarregar, refrescar, cache, novetats',
+ a:`Segurament el navegador té la versió antiga. Prova:<ol><li>Tanca l'app i torna-la a obrir.</li><li>Al navegador, recarrega amb força (a l'ordinador <b>Ctrl+Maj+R</b>; al mòbil, tanca la pestanya i reobre-la).</li><li>Mira el peu de pàgina: ha de dir <b>"pàgina vN · codi vN"</b> amb el mateix número als dos.</li></ol>Si els números no coincideixen, la pàgina encara no s'ha actualitzat del tot.`},
+{c:'help',q:'Tinc un error o alguna cosa no funciona',k:'error, fallo, bug, no funciona, no va, falla, problema, trencat, roto, no carrega, no carga, pantalla blanca, es queda penjat, colgado',
+ a:`Prova primer de <b>recarregar</b> la pàgina i tancar i tornar a entrar. Si continua, envia a l'organitzador una captura de pantalla amb el missatge d'error i digues-li què estaves fent.`},
+{c:'help',q:'Puc recuperar un jugador que he venut?',k:'recuperar jugador, desfer venda, deshacer venta, em penedeixo, me arrepiento, tornar a fitxar, vender por error, venut per error',
+ a:`No es pot desfer una venda, però, si el mercat és obert, el pots tornar a <b>fitxar</b> pagant el seu valor actual més la comissió del 5%. Compta com un fitxatge normal.`},
+{c:'help',q:'Qui m\'ajuda si no trobo la resposta?',k:'contacte, contacto, organitzador, organizador, ajuda humana, ajuda personal, parlar amb algu, hablar, soporte, suport, dubte, pregunta, no trobo',
+ a:`Parla amb l'<b>organitzador del Fantasy</b> del club (per exemple, al pavelló o pel grup del club). Si pots, explica-li què intentaves fer i què t'ha sortit.`},
+
+/* ---------- XARRADA ---------- */
+{c:'basic',hide:true,q:'Hola',k:'hola, bon dia, bona tarda, bona nit, hello, hi, bones, buenas, ei, ey',
+ a:`Hola! 👋 Soc l'assistent del Fantasy. Pregunta'm el que vulguis sobre les regles, el mercat, els punts o l'app.`},
+{c:'basic',hide:true,q:'Gràcies',k:'gracies, gracias, merci, perfecte, genial, ok, vale, molt be, thanks, adeu, adios',
+ a:`De res! 🏀 Si tens cap altre dubte, aquí em tens.`}
+];
+
+const BOT_STOP=new Set('el la els les un una uns unes de del dels al als i o a en es que com per perque quin quina quins quines què me em et te se si no mes molt hi ha han he ho puc pot poden vull tinc tens meu meva meus meves mi mis los las con para por como del una y es mas muy hay mio mia pot ser fer fa qui quan on cal cap tot tots tota totes jo tu ell ella son soc'.split(' '));
+function botNorm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/·/g,'').replace(/[^a-z0-9%+ ]+/g,' ').replace(/\s+/g,' ').trim(); }
+function botWords(s){ return botNorm(s).split(' ').filter(w=>w&&(w.length>=2)&&!BOT_STOP.has(w)); }
+function botSim(a,b){ // 0..1: igualtat o mateixa arrel
+  if(a===b) return 1;
+  const m=Math.min(a.length,b.length); if(m<4) return 0;
+  let i=0; while(i<m&&a[i]===b[i]) i++;
+  if(i>=Math.min(5,m)&&i>=m-3) return i===m?.85:.7;
+  return 0;
+}
+let _botIdx=null;
+function botIndex(){
+  if(_botIdx) return _botIdx;
+  _botIdx=BOT_KB.map((e,n)=>{
+    const kp=String(e.k||'').split(',').map(s=>botNorm(s)).filter(Boolean);
+    const kw=new Set(); kp.forEach(p=>botWords(p).forEach(w=>kw.add(w)));
+    return {n,e,phrases:kp.filter(p=>p.includes(' ')||p.length>=3),kw:[...kw],qw:botWords(e.q),aw:[...new Set(botWords(String(e.a||'').replace(/<[^>]+>/g,' ')))]};
+  });
+  return _botIdx;
+}
+function botSearch(query){
+  const qn=botNorm(query), qw=botWords(query);
+  if(!qn) return [];
+  const out=[];
+  for(const it of botIndex()){
+    let s=0, hit=0;
+    for(const t of qw){
+      let b=0;
+      for(const w of it.kw){ const v=botSim(t,w)*3; if(v>b) b=v; }
+      for(const w of it.qw){ const v=botSim(t,w)*2; if(v>b) b=v; }
+      if(b<2){ for(const w of it.aw){ const v=botSim(t,w)*.5; if(v>b) b=v; } }
+      if(b>0){ s+=b; if(b>=2) hit++; }
+    }
+    for(const p of it.phrases){ if(p.length>=4&&(' '+qn+' ').includes(' '+p+' ')) s+=p.includes(' ')?5:2.5; }
+    if(qw.length>1&&hit===qw.length) s+=2; // tots els mots de la pregunta coincideixen
+    if(qn===botNorm(it.e.q)) s+=20;
+    if(s>0) out.push({n:it.n,e:it.e,s});
+  }
+  return out.sort((a,b)=>b.s-a.s);
+}
+/*BOT-ENGINE-END*/
+
+
+/*BOT-UI-START*/
+let _botBuilt=false, _botWelcomed=false;
+const BOT_NOTFOUND=['No he trobat una resposta clara per a això. 🤔 Prova amb altres paraules (per exemple <i>mercat</i>, <i>capità</i>, <i>punts</i>, <i>QR</i>) o tria un tema:','Això no ho tinc clar. Reformula la pregunta amb altres paraules, o mira aquests temes:'];
+function botScroll(){ const m=$('botMsgs'); if(m) setTimeout(()=>{ m.scrollTop=m.scrollHeight; },30); }
+function botAdd(who,html,isText){
+  const m=$('botMsgs'); if(!m) return null;
+  const d=document.createElement('div'); d.className='bot-msg '+who;
+  if(isText) d.textContent=html; else d.innerHTML=html;
+  m.appendChild(d); botScroll(); return d;
+}
+function botQBtns(list){ return '<div class="bot-sugg">'+list.map(e=>`<button type="button" class="bot-q" data-q="${BOT_KB.indexOf(e)}">${e.q.replace(/</g,'&lt;')}</button>`).join('')+'</div>'; }
+function botCatBtns(){ return '<div class="bot-sugg">'+BOT_CATS.map(c=>`<button type="button" class="bot-cat" data-cat="${c.id}">${c.i} ${c.t}</button>`).join('')+'</div>'; }
+function botShowCat(id){
+  const c=BOT_CATS.find(x=>x.id===id); if(!c) return;
+  botAdd('user',c.i+' '+c.t,true);
+  const list=BOT_KB.filter(e=>e.c===id&&!e.hide);
+  setTimeout(()=>botAdd('bot',`<b>${c.i} ${c.t}</b>: tria una pregunta`+botQBtns(list)),150);
+}
+function botShowAnswer(e,related){
+  let h=`<div class="bot-ans">${e.a}</div>`;
+  if(e.d){ try{ h+=e.d(); }catch(x){} }
+  if(e.go) h+=`<div class="bot-goRow"><button type="button" class="bot-go" data-go="${e.go}">Anar-hi →</button></div>`;
+  if(related&&related.length) h+=`<div class="bot-rel">Potser també t'interessa:</div>`+botQBtns(related);
+  botAdd('bot',h);
+}
+function botAsk(text){
+  text=String(text||'').trim().slice(0,200); if(!text) return;
+  botAdd('user',text,true);
+  const res=botSearch(text).filter(r=>!r.e.hide||r.s>=8);
+  const top=res[0];
+  setTimeout(()=>{
+    if(top&&top.s>=2.5){
+      const rel=res.slice(1).filter(r=>!r.e.hide&&r.s>=Math.max(2.5,top.s*.45)).slice(0,2).map(r=>r.e);
+      botShowAnswer(top.e,rel);
+    } else {
+      const near=res.filter(r=>!r.e.hide&&r.s>=1.2).slice(0,3).map(r=>r.e);
+      let h=BOT_NOTFOUND[Math.floor(Math.random()*BOT_NOTFOUND.length)];
+      if(near.length) h+='<div class="bot-rel">Potser volies dir…</div>'+botQBtns(near);
+      h+=botCatBtns()+'<div class="bot-rel">Si encara no ho trobes, pregunta-ho a l\'organitzador del club.</div>';
+      botAdd('bot',h);
+    }
+  },250);
+}
+function botWelcome(){
+  if(_botWelcomed) return; _botWelcomed=true;
+  const pop=['Quan tanca i quan obre el mercat?','Com es guanyen punts?','Què és el capità i com el trio?','Com sumo punts anant a veure partits?'].map(q=>BOT_KB.find(e=>e.q===q)).filter(Boolean);
+  botAdd('bot',`Hola! 👋 Soc l'<b>assistent del Fantasy</b>. Escriu el teu dubte o tria un tema.`+botCatBtns()+'<div class="bot-rel">Preguntes habituals:</div>'+botQBtns(pop));
+}
+function botOpen(){
+  initBot(); const m=$('botModal'); if(!m) return;
+  m.style.display='flex'; document.body.classList.add('bot-open'); botWelcome(); botScroll();
+  if(window.matchMedia&&window.matchMedia('(hover:hover)').matches) setTimeout(()=>{ const i=$('botInput'); if(i) i.focus(); },50);
+}
+function botClose(){ const m=$('botModal'); if(m) m.style.display='none'; document.body.classList.remove('bot-open'); }
+function botHide(){ botClose(); const f=$('botFab'); if(f) f.style.display='none'; const m=$('botMsgs'); if(m) m.innerHTML=''; _botWelcomed=false; }
+function initBot(){
+  if(_botBuilt){ const f=$('botFab'); if(f) f.style.display=''; return; }
+  _botBuilt=true;
+  const fab=document.createElement('button'); fab.id='botFab'; fab.type='button'; fab.className='bot-fab'; fab.setAttribute('aria-label','Obrir l\'assistent d\'ajuda'); fab.innerHTML='<span>💬</span> Ajuda';
+  fab.onclick=botOpen; document.body.appendChild(fab);
+  const modal=document.createElement('div'); modal.id='botModal'; modal.className='bot-modal'; modal.style.display='none';
+  modal.innerHTML=`<div class="bot-box" role="dialog" aria-label="Assistent del Fantasy"><div class="bot-head"><b>🤖 Assistent del Fantasy</b><button type="button" id="botClose" aria-label="Tanca">✕</button></div><div id="botMsgs" class="bot-msgs" aria-live="polite"></div><div class="bot-topics" id="botTopics">${BOT_CATS.map(c=>`<button type="button" class="bot-cat" data-cat="${c.id}">${c.i} ${c.t}</button>`).join('')}</div><form id="botForm" class="bot-form" autocomplete="off"><input id="botInput" type="text" maxlength="200" placeholder="Escriu el teu dubte…" enterkeyhint="send"><button type="submit" aria-label="Envia">➤</button></form></div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',ev=>{
+    if(ev.target===modal){ botClose(); return; }
+    const b=ev.target.closest('button'); if(!b) return;
+    if(b.id==='botClose'){ botClose(); return; }
+    if(b.dataset.q!==undefined){ const e=BOT_KB[+b.dataset.q]; if(e){ botAdd('user',e.q,true); setTimeout(()=>botShowAnswer(e,[]),200); } return; }
+    if(b.dataset.cat){ botShowCat(b.dataset.cat); return; }
+    if(b.dataset.go){ const g=b.dataset.go; botClose(); try{ showSection(g); }catch(x){} return; }
+  });
+  $('botForm').addEventListener('submit',ev=>{ ev.preventDefault(); const i=$('botInput'); const v=i.value; i.value=''; botAsk(v); });
+  document.addEventListener('keydown',ev=>{ if(ev.key==='Escape') botClose(); });
+}
+/*BOT-UI-END*/
+
+const APP_VERSION=60; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
