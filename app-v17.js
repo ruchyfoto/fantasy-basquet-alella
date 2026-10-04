@@ -742,7 +742,7 @@ $('renameTeam').onclick=async()=>{
 /* ===== CONSELLS AUTOMÀTICS ===== */
 const TIP_MS=12000; /* temps entre frases, en mil·lisegons (12000 = 12 s) */
 const TIPS=[
-"Tens algun dubte? Toca el botó 💬 Ajuda de baix a la dreta i l’assistent te’l resol.",
+"Tens algun dubte? Toca el botó 💬 Ajuda de dalt a la dreta i l’assistent te’l resol.",
 "Comences amb 120 M€: gasta’ls amb cap, no cal fitxar-ho tot el primer dia.",
 "Una plantilla completa té 8 jugadors i 2 entrenadors.",
 "Pots tenir 2 jugadors del mateix equip real, però només una vegada: la resta, d’equips diferents!",
@@ -1404,7 +1404,7 @@ function initBot(){
 }
 /*BOT-UI-END*/
 
-const APP_VERSION=61; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=62; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
