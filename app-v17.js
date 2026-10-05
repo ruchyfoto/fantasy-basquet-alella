@@ -484,6 +484,7 @@ function init(){
   document.querySelectorAll('.market-tab').forEach(t=>t.addEventListener('click',()=>{state.marketType=t.dataset.market;document.querySelectorAll('.market-tab').forEach(x=>x.classList.toggle('active',x===t));$('search').value='';renderMarket();}));
   $('search').addEventListener('input',renderMarket); $('teamFilter').addEventListener('change',renderMarket);
   $('loginBtn').onclick=login; $('signupBtn').onclick=signup; $('logoutBtn').onclick=logout;
+  const authGate=$('authGate'); if(authGate) authGate.addEventListener('keydown',ev=>{ if(ev.key!=='Enter'||ev.isComposing) return; const t=ev.target; if(!t||t.tagName!=='INPUT'||t.type==='checkbox') return; const map={loginForm:'loginBtn',signupForm:'signupBtn',recoverForm:'recoverBtn',newPassForm:'newPassBtn'}; for(const f in map){ const form=$(f); if(form&&form.contains(t)){ ev.preventDefault(); const b=$(map[f]); if(b&&!b.disabled) b.click(); return; } } });
   $('adminUnlock').onclick=adminReset; $('adminSaveResults').onclick=saveAdminResults; $('adminProcessRound').onclick=processCurrentRound; $('adminNewRound').onclick=createNextRound; $('adminRollbackRound').onclick=rollbackLastRound; $('adminResetRounds').onclick=resetRounds;
   let clicks=0, timer=null; $('logoSecret').addEventListener('click',()=>{clicks++;clearTimeout(timer);timer=setTimeout(()=>clicks=0,1200);if(clicks>=5){clicks=0;openAdmin();}});
   const saved=localStorage.getItem('fantasySession');
@@ -1566,7 +1567,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=73; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=74; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
