@@ -149,7 +149,7 @@ function courtCard(p,isCap){
 function benchCard(c,realTeamId){
   const m=state.coachMarkets.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
   const photo=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
-  return `<div class="bench-card" data-cid="${c.id}" data-ctid="${realTeamId}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(coachName(c))}" data-ph="🧑‍🏫" onerror="fixImageError(this)"><div><b>${escapeHtml(coachName(c))}</b><small>🏀 ${escapeHtml(teamName(realTeamId))} · ${money(m?.current_value??c.current_value)}</small><small class="pts">⭐ Aporta: ${f1(state.coachPts?.[c.id+':'+realTeamId]||0)} pts</small><div><button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">💸 Vendre</button></div></div></div>`;
+  return `<div class="bench-card" data-cid="${c.id}" data-ctid="${realTeamId}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(coachName(c))}" data-ph="🧑‍🏫" onerror="fixImageError(this)"><div><b>${escapeHtml(coachName(c))}</b><small>🏀 ${escapeHtml(teamName(realTeamId))} · ${money(m?.current_value??c.current_value)}</small><small class="pts">⭐ Punts: ${f1(state.coachPts?.[c.id+':'+realTeamId]||0)}</small><div><button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">💸 Vendre</button></div></div></div>`;
 }
 function goMarket(type){ showSection('market'); const b=document.querySelector(`.market-tab[data-market="${type}"]`); if(b) b.click(); }
 function renderTeam(){
@@ -164,8 +164,8 @@ function renderTeam(){
   bindActions();
 }
 async function loadExtras(){
-  const [pt,ts,ln,cpR]=await Promise.all([rpc('get_player_points',{}),rpc('get_team_stats',{}),api('fantasy_lineups?select=slots&limit=1'),rpc('get_my_coach_points',{}).catch(()=>null)]);
-  state.coachPts=(cpR&&cpR.ok)?await cpR.json().catch(()=>({})):{};
+  const [pt,ts,ln,cpR]=await Promise.all([rpc('get_player_points',{}),rpc('get_team_stats',{}),api('fantasy_lineups?select=slots&limit=1'),api('coach_round_history?select=coach_id,real_team_id,total_points').catch(()=>null)]);
+  state.coachPts={}; if(cpR&&cpR.ok){ const rows=await cpR.json().catch(()=>[]); rows.forEach(r=>{ const k=r.coach_id+':'+r.real_team_id; state.coachPts[k]=(state.coachPts[k]||0)+Number(r.total_points||0); }); }
   state.pts=pt.ok?await pt.json().catch(()=>({})):{}; state.teamStats=ts.ok?await ts.json().catch(()=>({})):{};
   let lay=null; if(ln.ok){ const a=await ln.json().catch(()=>[]); lay=a[0]?.slots||null; }
   if(!lay){ try{lay=JSON.parse(localStorage.getItem('lineup_'+state.teamId)||'null');}catch{} }
@@ -1232,8 +1232,8 @@ const BOT_KB=[
  a:`La <b>ratxa</b> 🔥 compta les victòries <b>seguides</b> d'un equip. A partir de la <b>2a victòria seguida</b>, cada jugador suma 1 punt més per cada victòria consecutiva: <b>10</b> la 1a, <b>11</b> la 2a, <b>12</b> la 3a, <b>13</b> la 4a… També influeix en el valor. Si l'equip perd, la ratxa es reinicia.`},
 {c:'points',q:'Què són els jugadors destacats?',k:'destacat, destacats, destacado, destacados, highlight, 7 5 3, tres destacats, mvp, millor jugador, 7 punts, 5 punts, 3 punts, primer segon tercer',
  a:`Després del partit, l'<b>entrenador</b> de cada equip tria fins a <b>3 jugadors destacats, ordenats per importància</b>: el 1r rep <b>+7 punts</b>, el 2n <b>+5</b> i el 3r <b>+3</b>. Els reben encara que l'equip perdi. Sumen al jugador i, per tant, als equips Fantasy que el tinguin.`},
-{c:'points',q:'On veig els punts que em donen els entrenadors?',k:'punts entrenadors, puntos entrenadores, quant em dona el meu entrenador, aporta, aporten, punts que aporta, entrenador aporta, contribucio',
- a:`A la pestanya <b>Plantilla</b>, a la targeta de cada entrenador (a sota dels jugadors) hi ha la línia <b>⭐ Aporta: X pts</b>: són els punts que aquell entrenador ha sumat al <b>teu</b> equip, comptant només des que el vas fitxar.`,go:'team'},
+{c:'points',q:'On veig els punts dels entrenadors?',k:'punts entrenadors, puntos entrenadores, quant porta el meu entrenador, punts de l entrenador, entrenador punts',
+ a:`A la pestanya <b>Plantilla</b>, a la targeta de cada entrenador (sota els jugadors) hi surt <b>⭐ Punts: X</b>, igual que als jugadors: són els punts totals que ha fet aquell entrenador. Toca la targeta per veure'n les estadístiques jornada a jornada.`,go:'team'},
 {c:'points',q:'Hi ha punts negatius?',k:'negatius, negativos, restar, perdre punts, perder puntos, baixar punts, penalitzacio, penalizacion, menys punts, puc tenir punts negatius, sota zero',
  a:`<b>Sí, però només per les derrotes</b>: cada jugador teu que perd resta <b>−4 punts</b>. Els destacats (+7 / +5 / +3) i els punts extra (assistència, missions, pronòstics…) compensen. Per tant, el total d'un equip pot ser negatiu si fitxes jugadors d'equips que perden molt.`},
 {c:'points',q:'Quan se sumen els punts?',k:'quan, cuando, actualitzar punts, actualizar, processar jornada, processada, se sumen, no veig punts, tarden, retard, aparece',
@@ -1566,7 +1566,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=70; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=71; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
