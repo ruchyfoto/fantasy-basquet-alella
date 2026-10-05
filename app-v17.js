@@ -1015,7 +1015,7 @@ async function renderPush(){
   const sup=pushSupport(); card.style.display='';
   const info=$('pushInfo'), btn=$('pushBtn'), kinds=$('pushKinds'), test=$('pushTest'), off=$('pushOff');
   if(!sup.ok){
-    btn.style.display='none'; kinds.style.display='none'; test.style.display='none'; off.style.display='none';
+    btn.style.display='none'; kinds.style.display='none'; test.style.display='none'; off.style.display='none'; { const st=$('pushState'); if(st){ st.textContent='No disponible'; st.className='pm-st'; } }
     info.innerHTML=sup.why==='ios'?'A l’iPhone/iPad, per rebre notificacions primer cal <b>afegir aquesta web a la pantalla d’inici</b>: a Safari toca <b>Compartir</b> → <b>Afegeix a la pantalla d’inici</b>, i obre-la des de la nova icona. Després, torna aquí i activa-les (cal iOS 16.4 o superior).':'Aquest navegador no admet notificacions. Prova amb Chrome (Android/ordinador) o amb Safari afegint la web a la pantalla d’inici.';
     return;
   }
@@ -1032,6 +1032,7 @@ async function renderPush(){
   kinds.innerHTML=PUSH_KINDS.map(([k,l])=>`<label class="push-k"><input type="checkbox" value="${k}" ${kindsSel.includes(k)?'checked':''}> ${l}</label>`).join('');
   kinds.style.display=sub?'':'none'; test.style.display=sub?'':'none'; off.style.display=sub?'':'none';
   btn.style.display=sub?'none':'';
+  { const st=$('pushState'); if(st){ st.textContent=sub?'Activades':'Desactivades'; st.className='pm-st'+(sub?' on':''); } }
   info.textContent=sub?'✅ Notificacions activades en aquest dispositiu. Tria quins avisos vols rebre:':'Rep avisos al mòbil o a l’ordinador: quan tanca el mercat, quan es processa la jornada, partits a casa, taula i més.';
   kinds.querySelectorAll('input').forEach(i=>i.onchange=async()=>{ try{ await rpc('push_set_kinds',{p_endpoint:sub.endpoint,p_kinds:pushCheckedKinds()}); }catch(e){} });
 }
@@ -1567,7 +1568,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=74; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=75; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
