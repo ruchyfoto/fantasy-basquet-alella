@@ -513,6 +513,13 @@ function renderManage(){
   const byName=(a,b)=>coachName(a).localeCompare(coachName(b));
   const teamOpts=sel=>state.teams.map(t=>`<option value="${t.id}"${String(t.id)===String(sel)?' selected':''}>${escapeHtml(t.name)}</option>`).join('');
   const coachOpts=sel=>'<option value="">— Cap —</option>'+state.coaches.slice().sort(byName).map(c=>`<option value="${c.id}"${String(c.id)===String(sel)?' selected':''}>${escapeHtml(coachName(c))}</option>`).join('');
+  const ctBlock=c=>{
+    const rel=state.coachTeams.filter(r=>String(r.coach_id)===String(c.id));
+    const have=new Set(rel.map(r=>String(r.real_team_id)));
+    const chips=rel.map(r=>{ const m=state.coachMarkets.find(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(r.real_team_id)); return `<span class="mg-chip">${escapeHtml(teamName(r.real_team_id))}${m?` · ${f1(m.current_value)} M€`:''}${rel.length>1?`<button type="button" class="mg-x" data-mg="delct" data-tid="${r.real_team_id}" title="Treure aquest equip" aria-label="Treure aquest equip">✕</button>`:''}</span>`; }).join('');
+    const opts=state.teams.filter(t=>!have.has(String(t.id))).map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
+    return `<div class="mg-teams" data-cid="${c.id}"><small>Equips que entrena:</small>${chips||'<small>cap</small>'}${opts?`<select class="mg-ct">${opts}</select><button type="button" class="secondary" data-mg="addct">➕ Afegir equip</button>`:''}</div>`;
+  };
   const photo=k=>`<label class="secondary mg-ph" title="Pujar foto">📷<input type="file" accept="image/*" hidden data-mgphoto="${k}"></label>`;
   const who=id=>{const u=(state.adminUsers||[]).find(x=>x.user_id===id);return u?(u.username||u.email):'—';};
   const pl=state.players.filter(hit).sort(byName), cs=state.coaches.filter(hit).sort(byName);
@@ -523,7 +530,7 @@ function renderManage(){
   ${pl.length>40?'<small>Mostrant 40. Usa el cercador per afinar.</small>':''}
   <h4>🧑‍🏫 Entrenadors (${cs.length})</h4>
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
-  ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>`).join('')}
+  ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>${ctBlock(c)}`).join('')}
   <h4>👤 Usuaris, entrenadors i administradors</h4>
   ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
   <h4>📜 Registre d’activitat (últims 30)</h4>
@@ -547,6 +554,14 @@ async function uploadPhoto(kind,id,file){
 async function manageClick(e){
   const b=e.target.closest('[data-mg]'); if(!b) return;
   const row=b.closest('.mg-row'), a=b.dataset.mg;
+  if(a==='addct'||a==='delct'){
+    const tb=b.closest('.mg-teams'); if(!tb) return;
+    const cid=Number(tb.dataset.cid), c=state.coaches.find(x=>Number(x.id)===cid); let ok2=false, msg2='';
+    if(a==='addct'){ const t=Number(tb.querySelector('.mg-ct')?.value); if(!t) return alert('No queden equips per afegir.'); ok2=await adminRpc('admin_add_coach_team',{p_coach_id:cid,p_team_id:t,p_value:null}); msg2=`Equip afegit a ${coachName(c)}.`; }
+    else { const t=Number(b.dataset.tid); if(!confirm(`Treure ${teamName(t)} a ${coachName(c)}?\n\nSi algú el té fitxat per a aquest equip, se li reemborsarà el valor de mercat.`)) return; ok2=await adminRpc('admin_remove_coach_team',{p_coach_id:cid,p_team_id:t}); msg2=`Equip tret a ${coachName(c)}.`; }
+    if(ok2){ setAdminMessage('✅ '+msg2); await loadData(); await loadManage(); }
+    return;
+  }
   const v=s=>(row.querySelector(s)?.value||'').trim();
   const num=s=>v(s)===''?null:Number(v(s).replace(',','.'));
   const nom=()=>`${v('.mg-n')} ${v('.mg-s')}`.trim();
@@ -1568,7 +1583,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=76; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=77; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
