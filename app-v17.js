@@ -381,7 +381,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); loadHistory(true); initBot(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); loadHistory(true); initMinigames(); initBot(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -1583,7 +1583,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=77; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=78; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1664,3 +1664,127 @@ document.addEventListener('click',e=>{
   const row=e.target.closest('.hs-row'); if(row){ openStats(Number(row.dataset.id),row.dataset.kind==='coach'?'coach':'player',row.dataset.tid?Number(row.dataset.tid):null); }
 });
 /*HIST-END*/
+
+/*MG-START*/
+/* Minijocs: Llançaments lliures (només diversió: rècord i rànquing, sense punts del Fantasy) */
+var MG={raf:0,run:null,tab:'play',best:null};
+function mgEnsureDom(){
+  if($('mgModal')) return;
+  const m=document.createElement('div'); m.id='mgModal'; m.className='mg-modal'; m.style.display='none';
+  m.innerHTML=`<div class="mg-box"><div class="mg-top"><b>🏀 Llançaments lliures</b><span class="mg-tabs"><button data-mgt="play" class="on">Jugar</button><button data-mgt="rank">Rànquing</button></span><button id="mgClose" aria-label="Tanca">✕</button></div>
+  <div id="mgPlay"><div class="mg-hud"><span>⏱ <b id="mgTime">30</b></span><span>🏀 <b id="mgScore">0</b></span><span>🔥 <b id="mgStreak">0</b></span><span>🏆 <b id="mgBest">–</b></span></div>
+  <div class="mg-stage"><canvas id="mgCanvas" width="360" height="520"></canvas><div class="mg-over" id="mgOver"><div><h3 id="mgTitle">Preparat?</h3><p id="mgMsg">Llisca el dit cap amunt per llançar. 30 segons: encerta tantes cistelles com puguis! Cada cistella val 2 punts i les ratxes sumen extra.</p><button class="primary" id="mgGo">Jugar</button></div></div></div></div>
+  <div id="mgRank" style="display:none"><p class="st-empty">Carregant…</p></div></div>`;
+  document.body.appendChild(m);
+  $('mgClose').onclick=mgClose; $('mgGo').onclick=mgStart;
+  m.addEventListener('click',e=>{ if(e.target===m) mgClose(); const t=e.target.closest('[data-mgt]'); if(t) mgTab(t.dataset.mgt); });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&m.style.display!=='none') mgClose(); });
+  mgBind();
+}
+function mgOpen(){ mgEnsureDom(); $('mgModal').style.display='flex'; document.body.style.overflow='hidden'; mgTab('play'); mgDraw(null); }
+function mgClose(){ cancelAnimationFrame(MG.raf); MG.run=null; const m=$('mgModal'); if(m) m.style.display='none'; document.body.style.overflow=''; }
+function mgTab(t){
+  MG.tab=t; document.querySelectorAll('[data-mgt]').forEach(b=>b.classList.toggle('on',b.dataset.mgt===t));
+  $('mgPlay').style.display=t==='play'?'':'none'; $('mgRank').style.display=t==='rank'?'':'none';
+  if(t==='rank'){ if(MG.run){ MG.run=null; cancelAnimationFrame(MG.raf); mgShowOver('Pausa','Has sortit de la partida.','Jugar'); } mgLoadRank(); }
+}
+async function mgLoadRank(){
+  const box=$('mgRank'); box.innerHTML='<p class="st-empty">Carregant…</p>';
+  try{
+    const d=await lgCall('get_minigame_ranking',{p_game:'fts'}); const top=(d&&d.top)||[];
+    if(!top.length){ box.innerHTML='<p class="st-empty">Ningú ha jugat encara. Sigues el primer! 🏀</p>'; return; }
+    box.innerHTML='<ol class="mg-rank">'+top.map(r=>`<li class="${r.me?'me':''}"><span class="p">${r.pos<=3?['🥇','🥈','🥉'][r.pos-1]:r.pos}</span><span class="n">${escapeHtml(r.name)}${r.me?' (tu)':''}</span><span class="s">${r.best} pts</span></li>`).join('')+'</ol><p class="st-empty">Només diversió: aquest rànquing no suma punts al Fantasy.</p>';
+  }catch(e){ box.innerHTML=`<p class="st-empty">No s’ha pogut carregar el rànquing.<br><small>${escapeHtml(e.message)}</small></p>`; }
+}
+function mgShowOver(title,msg,btn){ $('mgTitle').textContent=title; $('mgMsg').textContent=msg; $('mgGo').textContent=btn||'Jugar'; $('mgOver').style.display='flex'; }
+function mgHoop(score,t){
+  // la cistella es mou quan vas sumant: horitzontal a partir de 6 pts, vertical a partir de 14
+  const amp=score>=6?Math.min(110,30+score*3):0, sp=1.1+Math.min(1.6,score/20);
+  const x=180+(amp?Math.sin(t*sp)*amp:0), y=score>=14?150+Math.sin(t*.7)*24:150;
+  return {x,y};
+}
+function mgStart(){
+  mgEnsureDom(); cancelAnimationFrame(MG.raf);
+  $('mgOver').style.display='none';
+  MG.run={t0:performance.now(),score:0,streak:0,ball:null,msg:'',msgT:0,last:performance.now(),ended:false,shots:0,makes:0,drag:null};
+  mgFrame();
+}
+function mgBind(){
+  const cv=$('mgCanvas'); cv.style.touchAction='none';
+  const pt=e=>{ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height,t:performance.now()}; };
+  cv.addEventListener('pointerdown',e=>{ const g=MG.run; if(!g||g.ended||g.ball) return; e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch{} g.drag={s:pt(e),c:pt(e)}; });
+  cv.addEventListener('pointermove',e=>{ const g=MG.run; if(g&&g.drag) g.drag.c=pt(e); });
+  const up=e=>{ const g=MG.run; if(!g||!g.drag) return; const s=g.drag.s,c=pt(e); g.drag=null;
+    const dx=c.x-s.x, dy=s.y-c.y; if(dy<25||g.ball||g.ended) return;
+    const hp=mgHoop(g.score,(performance.now()-g.t0)/1000);
+    // el llançament apunta on indica el gest: distància amunt = potència, desviació lateral = direcció
+    const tx=180+dx*1.5, ty=470-dy*1.7;
+    const T=0.75; g.ball={x0:180,y0:470,tx,ty,t:0,T,scored:null,hx:hp.x,hy:hp.y};
+    g.shots++; };
+  cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',()=>{ if(MG.run) MG.run.drag=null; });
+}
+function mgFrame(){
+  const g=MG.run; if(!g) return; const now=performance.now(), dt=Math.min(.05,(now-g.last)/1000); g.last=now;
+  const el=(now-g.t0)/1000, left=Math.max(0,30-el);
+  const hp=mgHoop(g.score,el);
+  const b=g.ball;
+  if(b){ b.t+=dt; const k=Math.min(1,b.t/b.T);
+    if(k>=1&&b.scored===null){
+      // resolem a l'arribada: comparem el punt d'arribada amb la cistella d'aquell moment
+      const ex=Math.abs(b.tx-hp.x), ey=Math.abs(b.ty-hp.y), tolX=Math.max(26,40-g.score*.5), tolY=34;
+      const d=Math.hypot(ex/tolX,ey/tolY);
+      if(d<=1){ g.streak++; const pts=2+Math.min(3,g.streak-1); g.score+=pts; g.makes++; b.scored=true; g.msg=(d<.4?'💦 Swish! ':'✅ ')+'+'+pts; if(g.streak>=3) g.msg+=' 🔥'; }
+      else { b.scored=false; g.streak=0; g.msg=d<1.5?'Ha sortit per poc…':'Fallat'; }
+      g.msgT=now; b.rest=0.35;
+    }
+    if(b.scored!==null){ b.rest-=dt; if(b.rest<=0) g.ball=null; }
+  }
+  mgDraw(g,hp,left);
+  $('mgTime').textContent=Math.ceil(left); $('mgScore').textContent=g.score; $('mgStreak').textContent=g.streak;
+  if(left<=0&&!g.ball&&!g.ended){ g.ended=true; MG.run=null; mgFinish(g); return; }
+  MG.raf=requestAnimationFrame(mgFrame);
+}
+function mgDraw(g,hp,left){
+  const cv=$('mgCanvas'); if(!cv) return; const c=cv.getContext('2d'); const W=360,H=520;
+  hp=hp||{x:180,y:150};
+  const bg=c.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#1d2a44'); bg.addColorStop(.55,'#2f3f63'); bg.addColorStop(.56,'#c98a4b'); bg.addColorStop(1,'#a96e37');
+  c.fillStyle=bg; c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=3; c.beginPath(); c.arc(180,H+40,150,Math.PI,2*Math.PI); c.stroke();
+  // tauler i cistella
+  const bx=hp.x,by=hp.y;
+  c.fillStyle='rgba(255,255,255,.92)'; c.fillRect(bx-48,by-62,96,62); c.strokeStyle='#e8762c'; c.lineWidth=3; c.strokeRect(bx-20,by-30,40,24);
+  c.strokeStyle='rgba(255,255,255,.7)'; c.lineWidth=1.5; for(let i=-3;i<=3;i++){ c.beginPath(); c.moveTo(bx+i*8,by+4); c.lineTo(bx+i*5,by+34); c.stroke(); }
+  const ball=g&&g.ball;
+  const drawBall=(x,y,r)=>{ c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x,Math.min(H-12,y+r+6),r*.9,r*.28,0,0,7); c.fill();
+    const gr=c.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r); gr.addColorStop(0,'#ffa24d'); gr.addColorStop(1,'#d9611a'); c.fillStyle=gr; c.beginPath(); c.arc(x,y,r,0,7); c.fill();
+    c.strokeStyle='#5a2a0c'; c.lineWidth=Math.max(1,r*.07); c.beginPath(); c.arc(x,y,r,0,7); c.moveTo(x-r,y); c.lineTo(x+r,y); c.moveTo(x,y-r); c.lineTo(x,y+r); c.stroke(); };
+  let bp=null;
+  if(ball){ const k=Math.min(1,ball.t/ball.T); const x=ball.x0+(ball.tx-ball.x0)*k, yl=ball.y0+(ball.ty-ball.y0)*k, arc=Math.sin(Math.PI*k)*120; bp={x,y:yl-arc,r:26-14*k,k}; }
+  else if(g&&!g.ended){ bp={x:180,y:470,r:26,k:0}; }
+  // anell darrere + pilota + anell davant
+  c.strokeStyle='#e8762c'; c.lineWidth=5; c.beginPath(); c.ellipse(bx,by,30,8,0,Math.PI,2*Math.PI); c.stroke();
+  if(bp) drawBall(bp.x,bp.y,bp.r);
+  c.beginPath(); c.ellipse(bx,by,30,8,0,0,Math.PI); c.stroke();
+  // guia de llançament
+  if(g&&g.drag){ const s=g.drag.s,cc=g.drag.c; c.strokeStyle='rgba(255,255,255,.7)'; c.setLineDash([6,6]); c.lineWidth=3; c.beginPath(); c.moveTo(s.x,s.y); c.lineTo(cc.x,cc.y); c.stroke(); c.setLineDash([]); }
+  if(g&&g.msg&&performance.now()-g.msgT<900){ c.font='bold 30px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='#fff'; c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=5; c.strokeText(g.msg,180,260); c.fillText(g.msg,180,260); }
+  if(g&&!g.shots&&!g.ball&&left>28){ c.font='600 16px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='rgba(255,255,255,.9)'; c.fillText('⬆ Llisca cap amunt per llançar',180,420); }
+}
+async function mgFinish(g){
+  const sc=Math.min(150,g.score); let msg=`${g.makes} cistelles de ${g.shots} llançaments · ${sc} punts.`, title=sc>=30?'Increïble!':sc>=15?'Bona partida!':'Fi de la partida';
+  mgShowOver(title,msg+' Desant…','Torna-hi');
+  try{
+    const r=await lgCall('submit_minigame_score',{p_game:'fts',p_score:sc});
+    MG.best=r.best; $('mgBest').textContent=r.best;
+    if(r.new_record&&sc>0){ title='🏆 Nou rècord!'; confetti(); }
+    mgShowOver(title,msg+` El teu rècord: ${r.best}.`,'Torna-hi'); mgHomeCard();
+  }catch(e){ mgShowOver(title,msg+' '+(/ràpid/i.test(e.message)?'Espera uns segons per desar la puntuació i torna a jugar.':'No s’ha pogut desar ('+e.message+').'),'Torna-hi'); }
+}
+async function mgHomeCard(){
+  const el=$('mgBestHome'); if(!el) return;
+  try{ const d=await lgCall('get_minigame_ranking',{p_game:'fts'}); const me=((d&&d.top)||[]).find(r=>r.me);
+    if(me){ MG.best=me.best; el.textContent=`El teu rècord: ${me.best} pts · posició ${me.pos}`; const b=$('mgBest'); if(b) b.textContent=me.best; }
+    else el.textContent='Encara no has jugat. Cap puntuació? A per la primera!'; }catch{ el.textContent='Només diversió: no suma punts al Fantasy.'; }
+}
+function initMinigames(){ const b=$('mgPlayBtn'); if(b&&!b._mg){ b._mg=1; b.onclick=mgOpen; } mgHomeCard(); }
+/*MG-END*/
