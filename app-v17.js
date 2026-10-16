@@ -1583,7 +1583,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=78; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=79; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1697,78 +1697,113 @@ async function mgLoadRank(){
   }catch(e){ box.innerHTML=`<p class="st-empty">No s’ha pogut carregar el rànquing.<br><small>${escapeHtml(e.message)}</small></p>`; }
 }
 function mgShowOver(title,msg,btn){ $('mgTitle').textContent=title; $('mgMsg').textContent=msg; $('mgGo').textContent=btn||'Jugar'; $('mgOver').style.display='flex'; }
-function mgHoop(score,t){
-  // la cistella es mou quan vas sumant: horitzontal a partir de 6 pts, vertical a partir de 14
-  const amp=score>=6?Math.min(110,30+score*3):0, sp=1.1+Math.min(1.6,score/20);
-  const x=180+(amp?Math.sin(t*sp)*amp:0), y=score>=14?150+Math.sin(t*.7)*24:150;
-  return {x,y};
-}
+/* ===== Joc 3D (perspectiva + física 3D pròpies, sense llibreries) ===== */
+var MG3={cx:0,cy:2.9,cz:7.7,pitch:.2,F:470,oy:225,R:.4,br:.12,G:9.8,sz:4.6,sy:1.15,rimY:3.05};
+function mgP(x,y,z){ const c=Math.cos(MG3.pitch),s=Math.sin(MG3.pitch), dx=x-MG3.cx, dy=y-MG3.cy, dz=z-MG3.cz;
+  const dep=-dy*s-dz*c, up=dy*c-dz*s, k=MG3.F/dep; return {x:180+dx*k, y:MG3.oy-up*k, k}; }
+function mgHoop(g){ const sc=g.score, hc=g.hc;
+  const amp=sc>=6?Math.min(1.5,.35+sc*.035):0, sp=1.1+Math.min(1.4,sc/22);
+  return {x:amp?Math.sin(hc*sp)*amp:0, z:sc>=14?Math.sin(hc*.65)*.7:0}; }
 function mgStart(){
   mgEnsureDom(); cancelAnimationFrame(MG.raf);
   $('mgOver').style.display='none';
-  MG.run={t0:performance.now(),score:0,streak:0,ball:null,msg:'',msgT:0,last:performance.now(),ended:false,shots:0,makes:0,drag:null};
+  MG.run={t0:performance.now(),score:0,streak:0,ball:null,msg:'',msgT:0,last:performance.now(),ended:false,shots:0,makes:0,drag:null,hc:0,left:30,netT:-9};
   mgFrame();
 }
 function mgBind(){
   const cv=$('mgCanvas'); cv.style.touchAction='none';
-  const pt=e=>{ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height,t:performance.now()}; };
+  const pt=e=>{ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)*cv.width/r.width,y:(e.clientY-r.top)*cv.height/r.height}; };
   cv.addEventListener('pointerdown',e=>{ const g=MG.run; if(!g||g.ended||g.ball) return; e.preventDefault(); try{cv.setPointerCapture(e.pointerId);}catch{} g.drag={s:pt(e),c:pt(e)}; });
   cv.addEventListener('pointermove',e=>{ const g=MG.run; if(g&&g.drag) g.drag.c=pt(e); });
-  const up=e=>{ const g=MG.run; if(!g||!g.drag) return; const s=g.drag.s,c=pt(e); g.drag=null;
-    const dx=c.x-s.x, dy=s.y-c.y; if(dy<25||g.ball||g.ended) return;
-    const hp=mgHoop(g.score,(performance.now()-g.t0)/1000);
-    // el llançament apunta on indica el gest: distància amunt = potència, desviació lateral = direcció
-    const tx=180+dx*1.5, ty=470-dy*1.7;
-    const T=0.75; g.ball={x0:180,y0:470,tx,ty,t:0,T,scored:null,hx:hp.x,hy:hp.y};
-    g.shots++; };
-  cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',()=>{ if(MG.run) MG.run.drag=null; });
+  cv.addEventListener('pointerup',e=>{ const g=MG.run; if(!g||!g.drag) return; const s=g.drag.s,c=pt(e); g.drag=null;
+    const aim=mgAim(s,c); if(!aim||g.ball||g.ended) return; mgLaunch(g,aim); });
+  cv.addEventListener('pointercancel',()=>{ if(MG.run) MG.run.drag=null; });
+}
+function mgAim(s,c){ const dx=c.x-s.x, dy=s.y-c.y; if(dy<25) return null;
+  return {tx:Math.max(-2.6,Math.min(2.6,dx*.0145)), tz:Math.max(-3,Math.min(6,MG3.sz-dy*(MG3.sz/260)))}; }
+function mgLaunch(g,a){
+  const T=1.0, S={x:0,y:MG3.sy,z:MG3.sz};
+  g.ball={p:{...S},pp:{...S},v:{x:(a.tx-S.x)/T,y:(MG3.rimY-S.y+.5*MG3.G*T*T)/T,z:(a.tz-S.z)/T},t:0,scored:false,touched:false,resolved:false,rest:.55,spin:0,hoop:mgHoop(g)};
+  g.shots++;
+}
+function mgStep(g,dt){
+  const b=g.ball, h=b.hoop, R=MG3.R, br=MG3.br, rimY=MG3.rimY;
+  b.t+=dt; b.pp={...b.p};
+  b.v.y-=MG3.G*dt; b.p.x+=b.v.x*dt; b.p.y+=b.v.y*dt; b.p.z+=b.v.z*dt; b.spin+=dt*6;
+  // tauler
+  const bz=h.z-.42;
+  if(b.pp.z-br>=bz && b.p.z-br<bz && Math.abs(b.p.x-h.x)<.95 && b.p.y>rimY-.15 && b.p.y<rimY+1.0){ b.p.z=bz+br; b.v.z=Math.abs(b.v.z)*.55; b.v.x*=.9; b.touched=true; }
+  // anella: 24 punts de col·lisió
+  for(let i=0;i<24;i++){ const a=i*Math.PI/12, rx=h.x+R*Math.cos(a), rz=h.z+R*Math.sin(a);
+    const dx=b.p.x-rx, dy=b.p.y-rimY, dz=b.p.z-rz, d=Math.hypot(dx,dy,dz), m=br+.035;
+    if(d<m&&d>1e-6){ const nx=dx/d,ny=dy/d,nz=dz/d, vn=b.v.x*nx+b.v.y*ny+b.v.z*nz;
+      b.p.x=rx+nx*m; b.p.y=rimY+ny*m; b.p.z=rz+nz*m;
+      if(vn<0){ const k=(1+.55)*vn; b.v.x-=k*nx; b.v.y-=k*ny; b.v.z-=k*nz; b.v.x*=.97; b.v.z*=.97; }
+      b.touched=true; } }
+  // cistella: creua el pla de l'anella cap avall dins del cercle
+  if(!b.scored && b.pp.y>rimY && b.p.y<=rimY && b.v.y<0 && Math.hypot(b.p.x-h.x,b.p.z-h.z)<R-.05){ b.scored=true; g.netT=performance.now(); }
+  if(b.scored && b.p.y<rimY && b.p.y>rimY-.6){ b.v.x*=1-9*dt; b.v.z*=1-9*dt; if(b.v.y<-3.2) b.v.y=-3.2; }
+  if(b.p.y<br){ b.p.y=br; b.v.y=-b.v.y*.5; b.v.x*=.8; b.v.z*=.8; }
+  if(!b.resolved){
+    if(b.scored && b.p.y<rimY-.55){ b.resolved=true; g.streak++; const pts=2+Math.min(3,g.streak-1); g.score+=pts; g.makes++;
+      g.msg=(b.touched?'✅ ':'💦 Swish! ')+'+'+pts+(g.streak>=3?' 🔥':''); g.msgT=performance.now(); }
+    else if(!b.scored && (b.p.y<=br+.01 || b.t>3.5)){ b.resolved=true; g.streak=0; g.msg=b.touched?'Ha tocat el ferro…':'Fallat'; g.msgT=performance.now(); }
+  }
 }
 function mgFrame(){
   const g=MG.run; if(!g) return; const now=performance.now(), dt=Math.min(.05,(now-g.last)/1000); g.last=now;
-  const el=(now-g.t0)/1000, left=Math.max(0,30-el);
-  const hp=mgHoop(g.score,el);
-  const b=g.ball;
-  if(b){ b.t+=dt; const k=Math.min(1,b.t/b.T);
-    if(k>=1&&b.scored===null){
-      // resolem a l'arribada: comparem el punt d'arribada amb la cistella d'aquell moment
-      const ex=Math.abs(b.tx-hp.x), ey=Math.abs(b.ty-hp.y), tolX=Math.max(26,40-g.score*.5), tolY=34;
-      const d=Math.hypot(ex/tolX,ey/tolY);
-      if(d<=1){ g.streak++; const pts=2+Math.min(3,g.streak-1); g.score+=pts; g.makes++; b.scored=true; g.msg=(d<.4?'💦 Swish! ':'✅ ')+'+'+pts; if(g.streak>=3) g.msg+=' 🔥'; }
-      else { b.scored=false; g.streak=0; g.msg=d<1.5?'Ha sortit per poc…':'Fallat'; }
-      g.msgT=now; b.rest=0.35;
-    }
-    if(b.scored!==null){ b.rest-=dt; if(b.rest<=0) g.ball=null; }
-  }
-  mgDraw(g,hp,left);
+  if(!g.ball) g.hc+=dt;
+  const left=Math.max(0,30-(now-g.t0)/1000); g.left=left;
+  if(g.ball){ let r=dt; while(r>1e-6){ const s=Math.min(r,1/120); mgStep(g,s); r-=s; }
+    if(g.ball.resolved){ g.ball.rest-=dt; if(g.ball.rest<=0) g.ball=null; } }
+  mgDraw(g,left);
   $('mgTime').textContent=Math.ceil(left); $('mgScore').textContent=g.score; $('mgStreak').textContent=g.streak;
   if(left<=0&&!g.ball&&!g.ended){ g.ended=true; MG.run=null; mgFinish(g); return; }
   MG.raf=requestAnimationFrame(mgFrame);
 }
-function mgDraw(g,hp,left){
-  const cv=$('mgCanvas'); if(!cv) return; const c=cv.getContext('2d'); const W=360,H=520;
-  hp=hp||{x:180,y:150};
-  const bg=c.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#1d2a44'); bg.addColorStop(.55,'#2f3f63'); bg.addColorStop(.56,'#c98a4b'); bg.addColorStop(1,'#a96e37');
-  c.fillStyle=bg; c.fillRect(0,0,W,H);
-  c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=3; c.beginPath(); c.arc(180,H+40,150,Math.PI,2*Math.PI); c.stroke();
-  // tauler i cistella
-  const bx=hp.x,by=hp.y;
-  c.fillStyle='rgba(255,255,255,.92)'; c.fillRect(bx-48,by-62,96,62); c.strokeStyle='#e8762c'; c.lineWidth=3; c.strokeRect(bx-20,by-30,40,24);
-  c.strokeStyle='rgba(255,255,255,.7)'; c.lineWidth=1.5; for(let i=-3;i<=3;i++){ c.beginPath(); c.moveTo(bx+i*8,by+4); c.lineTo(bx+i*5,by+34); c.stroke(); }
-  const ball=g&&g.ball;
-  const drawBall=(x,y,r)=>{ c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(x,Math.min(H-12,y+r+6),r*.9,r*.28,0,0,7); c.fill();
-    const gr=c.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r); gr.addColorStop(0,'#ffa24d'); gr.addColorStop(1,'#d9611a'); c.fillStyle=gr; c.beginPath(); c.arc(x,y,r,0,7); c.fill();
-    c.strokeStyle='#5a2a0c'; c.lineWidth=Math.max(1,r*.07); c.beginPath(); c.arc(x,y,r,0,7); c.moveTo(x-r,y); c.lineTo(x+r,y); c.moveTo(x,y-r); c.lineTo(x,y+r); c.stroke(); };
-  let bp=null;
-  if(ball){ const k=Math.min(1,ball.t/ball.T); const x=ball.x0+(ball.tx-ball.x0)*k, yl=ball.y0+(ball.ty-ball.y0)*k, arc=Math.sin(Math.PI*k)*120; bp={x,y:yl-arc,r:26-14*k,k}; }
-  else if(g&&!g.ended){ bp={x:180,y:470,r:26,k:0}; }
-  // anell darrere + pilota + anell davant
-  c.strokeStyle='#e8762c'; c.lineWidth=5; c.beginPath(); c.ellipse(bx,by,30,8,0,Math.PI,2*Math.PI); c.stroke();
-  if(bp) drawBall(bp.x,bp.y,bp.r);
-  c.beginPath(); c.ellipse(bx,by,30,8,0,0,Math.PI); c.stroke();
-  // guia de llançament
-  if(g&&g.drag){ const s=g.drag.s,cc=g.drag.c; c.strokeStyle='rgba(255,255,255,.7)'; c.setLineDash([6,6]); c.lineWidth=3; c.beginPath(); c.moveTo(s.x,s.y); c.lineTo(cc.x,cc.y); c.stroke(); c.setLineDash([]); }
-  if(g&&g.msg&&performance.now()-g.msgT<900){ c.font='bold 30px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='#fff'; c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=5; c.strokeText(g.msg,180,260); c.fillText(g.msg,180,260); }
-  if(g&&!g.shots&&!g.ball&&left>28){ c.font='600 16px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='rgba(255,255,255,.9)'; c.fillText('⬆ Llisca cap amunt per llançar',180,420); }
+function mgPoly(c,pts,close){ c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(p.x,p.y):c.moveTo(p.x,p.y)); if(close) c.closePath(); }
+function mgDraw(g,left){
+  const cv=$('mgCanvas'); if(!cv) return; const c=cv.getContext('2d'), W=360,H=520, P=mgP, rimY=MG3.rimY;
+  const h=(g&&g.ball&&g.ball.hoop)||(g?mgHoop(g):{x:0,z:0});
+  // paret + terra
+  const wall=P(0,0,-4).y;
+  let gr=c.createLinearGradient(0,0,0,wall); gr.addColorStop(0,'#101a30'); gr.addColorStop(1,'#2b3c63'); c.fillStyle=gr; c.fillRect(0,0,W,H);
+  gr=c.createLinearGradient(0,wall,0,H); gr.addColorStop(0,'#b97a43'); gr.addColorStop(1,'#d9a064'); c.fillStyle=gr; c.fillRect(0,wall,W,H-wall);
+  // zona (pintura) i línies
+  c.fillStyle='rgba(180,70,40,.35)'; mgPoly(c,[P(-2.45,0,-1.2),P(2.45,0,-1.2),P(2.45,0,MG3.sz),P(-2.45,0,MG3.sz)],true); c.fill();
+  c.strokeStyle='rgba(255,255,255,.8)'; c.lineWidth=2; mgPoly(c,[P(-2.45,0,-1.2),P(2.45,0,-1.2),P(2.45,0,MG3.sz),P(-2.45,0,MG3.sz)],true); c.stroke();
+  const arc=[]; for(let i=0;i<=24;i++){ const a=Math.PI+i*Math.PI/24; arc.push(P(1.8*Math.cos(a),0,MG3.sz+1.8*Math.sin(a)*-1)); } c.stroke(); mgPoly(c,arc,false); c.stroke();
+  // tauler
+  const bz=h.z-.42, q=[P(h.x-.9,rimY-.15,bz),P(h.x+.9,rimY-.15,bz),P(h.x+.9,rimY+.9,bz),P(h.x-.9,rimY+.9,bz)];
+  c.fillStyle='rgba(255,255,255,.92)'; mgPoly(c,q,true); c.fill(); c.strokeStyle='#9aa7bd'; c.lineWidth=2; c.stroke();
+  c.strokeStyle='#e8762c'; c.lineWidth=2.5; mgPoly(c,[P(h.x-.3,rimY,bz),P(h.x+.3,rimY,bz),P(h.x+.3,rimY+.45,bz),P(h.x-.3,rimY+.45,bz)],true); c.stroke();
+  // anella (part del darrere)
+  const ring=a0=>{ const p=[]; for(let i=0;i<=16;i++){ const a=a0+i*Math.PI/16; p.push(P(h.x+MG3.R*Math.cos(a),rimY,h.z+MG3.R*Math.sin(a))); } return p; };
+  const kk=P(h.x,rimY,h.z).k;
+  c.strokeStyle='#e8762c'; c.lineWidth=Math.max(2.5,kk*.05); c.lineCap='round'; mgPoly(c,ring(Math.PI),false); c.stroke();
+  // ombra de la pilota a terra
+  const b=g&&g.ball, S={x:0,y:MG3.sy,z:MG3.sz};
+  const pos=b?b.p:(g&&!g.ended?S:null);
+  if(pos){ const sp=P(pos.x,0,pos.z), r=MG3.br*sp.k, al=Math.max(.08,.3-pos.y*.06); c.fillStyle=`rgba(0,0,0,${al})`; c.beginPath(); c.ellipse(sp.x,sp.y,r*1.1,r*.35,0,0,7); c.fill(); }
+  // pilota
+  if(pos){ const sp=P(pos.x,pos.y,pos.z), r=MG3.br*sp.k, sx=sp.x, sy=sp.y;
+    const bg=c.createRadialGradient(sx-r*.35,sy-r*.35,r*.1,sx,sy,r); bg.addColorStop(0,'#ffab5c'); bg.addColorStop(1,'#d2581a'); c.fillStyle=bg; c.beginPath(); c.arc(sx,sy,r,0,7); c.fill();
+    const sa=b?b.spin:0; c.strokeStyle='#5a2a0c'; c.lineWidth=Math.max(1,r*.07); c.beginPath(); c.arc(sx,sy,r,0,7);
+    c.moveTo(sx-r*Math.cos(sa),sy-r*Math.sin(sa)); c.lineTo(sx+r*Math.cos(sa),sy+r*Math.sin(sa));
+    c.moveTo(sx-r*Math.sin(sa),sy+r*Math.cos(sa)); c.lineTo(sx+r*Math.sin(sa),sy-r*Math.cos(sa)); c.stroke(); }
+  // anella (part del davant) i xarxa
+  c.strokeStyle='#e8762c'; c.lineWidth=Math.max(2.5,kk*.05); mgPoly(c,ring(0),false); c.stroke();
+  const sw=g&&performance.now()-g.netT<450?1.18:1;
+  c.strokeStyle='rgba(255,255,255,.75)'; c.lineWidth=Math.max(1,kk*.018);
+  for(let i=0;i<12;i++){ const a=i*Math.PI/6, a2=a+.25, R=MG3.R;
+    mgPoly(c,[P(h.x+R*Math.cos(a),rimY,h.z+R*Math.sin(a)),P(h.x+R*.8*sw*Math.cos(a2),rimY-.22,h.z+R*.8*sw*Math.sin(a2)),P(h.x+R*.58*sw*Math.cos(a),rimY-.45,h.z+R*.58*sw*Math.sin(a))],false); c.stroke(); }
+  const nr=[]; for(let i=0;i<=24;i++){ const a=i*Math.PI/12; nr.push(P(h.x+MG3.R*.8*sw*Math.cos(a),rimY-.22,h.z+MG3.R*.8*sw*Math.sin(a))); } mgPoly(c,nr,false); c.stroke();
+  // guia: anell on apuntes
+  if(g&&g.drag){ const aim=mgAim(g.drag.s,g.drag.c), s0=P(S.x,S.y,S.z);
+    if(aim){ const tp=P(aim.tx,rimY,aim.tz), rr=MG3.R*tp.k; c.strokeStyle='rgba(255,255,255,.9)'; c.setLineDash([5,5]); c.lineWidth=2;
+      c.beginPath(); c.ellipse(tp.x,tp.y,rr,rr*.38,0,0,7); c.stroke(); c.beginPath(); c.moveTo(s0.x,s0.y); c.quadraticCurveTo((s0.x+tp.x)/2,Math.min(s0.y,tp.y)-70,tp.x,tp.y); c.stroke(); c.setLineDash([]); } }
+  if(g&&g.msg&&performance.now()-g.msgT<900){ c.font='bold 30px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='#fff'; c.strokeStyle='rgba(0,0,0,.6)'; c.lineWidth=5; c.strokeText(g.msg,180,300); c.fillText(g.msg,180,300); }
+  if(g&&!g.shots&&!g.ball&&left>28){ c.font='600 14px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='rgba(255,255,255,.95)'; c.fillText('⬆ Llisca cap amunt per llançar',180,505); }
 }
 async function mgFinish(g){
   const sc=Math.min(150,g.score); let msg=`${g.makes} cistelles de ${g.shots} llançaments · ${sc} punts.`, title=sc>=30?'Increïble!':sc>=15?'Bona partida!':'Fi de la partida';
