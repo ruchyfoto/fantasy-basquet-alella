@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=84; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=85; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1847,8 +1847,8 @@ function initMinigames(){ const b=$('mgPlayBtn'), w=$('mgWhoBtn'); if(b&&!b._mg)
 function whoName(x){ const t=s=>String(s||'').toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()).trim(); return (t(x.name)+' '+t(x.surname)).trim(); }
 function whoPool(){
   const seen=new Set(), out=[];
-  (state.players||[]).filter(p=>p.photo_url&&String(p.photo_url).length>4&&p.is_active!==false).forEach(p=>out.push({id:'p'+p.id,photo:p.photo_url,name:whoName(p),k:'p'}));
-  (state.coaches||[]).filter(c=>c.photo_url&&String(c.photo_url).includes('/storage/v1/')&&c.is_active!==false).forEach(c=>out.push({id:'c'+c.id,photo:c.photo_url,name:whoName(c),k:'c'}));
+  (state.players||[]).filter(p=>p.photo_url&&String(p.photo_url).trim().length>4&&!/logo|placeholder/i.test(String(p.photo_url))&&p.is_active!==false).forEach(p=>out.push({id:'p'+p.id,photo:p.photo_url,name:whoName(p),k:'p'}));
+  (state.coaches||[]).filter(c=>c.photo_url&&String(c.photo_url).includes('/storage/v1/')&&!/logo|placeholder/i.test(String(c.photo_url))&&c.is_active!==false).forEach(c=>out.push({id:'c'+c.id,photo:c.photo_url,name:whoName(c),k:'c'}));
   return out.filter(x=>x.name&&!seen.has(x.name.toLowerCase())&&seen.add(x.name.toLowerCase()));
 }
 function whoShuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -1878,7 +1878,7 @@ function whoNext(g){
   im.onerror=()=>{ g.bad.add(q.id); whoNext(g); };
   im.onload=()=>{
     if(MG.run!==g||g.ended) return;
-    const qy=Math.random()<.25?1:0, qx=Math.random()<.5?1:0; /* només es veu una quarta part; la meitat de dalt és més probable (hi ha la cara) */
+    const qy=0, qx=Math.random()<.5?1:0; /* només es veu una quarta part: sempre de la meitat de dalt (hi ha la cara), esquerra o dreta */
     g.cur={q,opts}; g.lock=false;
     $('mgWhoBox').innerHTML=`<div class="who-q">Quina persona és?</div><div class="who-img" id="whoImg"><img src="${escapeHtml(q.photo)}" alt="" style="left:${qx?-100:0}%;top:${qy?-100:0}%"></div><div class="who-pop" id="whoPop"></div><div class="who-opts">${opts.map((o,i)=>`<button type="button" data-wo="${i}">${escapeHtml(o.name)}</button>`).join('')}</div>`;
   };
