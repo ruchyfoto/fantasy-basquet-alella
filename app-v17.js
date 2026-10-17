@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=87; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=88; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1942,15 +1942,15 @@ function cdCell(r){ return r.own?cdHtml(r.k,r.id,r.own.rarity,{qty:r.own.qty}):`
 function cdOpenAlbum(dir){
   if(!CD.data) return; if(typeof dir!=='string') dir='';
   const b=cdBook(), n=b.pages.length, own=cdOwnedMap(); CD.page=Math.max(0,Math.min(CD.page||0,n)); const pi=CD.page;
-  let title='Àlbum de cromos', sub='', body;
+  let sub='', body;
   if(pi===0){
-    const pct=b.total?Math.round(b.have*100/b.total):0; sub=`${b.have} de ${b.total} cromos (${pct}%)`;
-    body=`<div class="cd-prog"><div style="width:${pct}%"></div></div><div class="cd-sec">Índex</div><div class="cd-idx">${b.pages.map((p,i)=>`<button type="button" data-cdgo="${i+1}"><span>${escapeHtml(p.name)}</span><small>${p.have}/${p.total}</small><i style="width:${p.total?Math.round(p.have*100/p.total):0}%"></i></button>`).join('')||'<p class="st-empty">Encara no hi ha cromos.</p>'}</div><p class="st-empty">Toca un equip o llisca cap a l’esquerra per passar pàgina.</p>`;
+    const pct=b.total?Math.round(b.have*100/b.total):0; sub='Portada i índex';
+    body=`<div class="bk-cover"><img src="logo.png" alt="" onerror="this.style.display='none'"><div class="bk-script">Àlbum de cromos</div><div class="bk-sub">Fantasy Bàsquet Alella</div><div class="bk-stamp"><b>${b.have}</b><span>de ${b.total}</span></div><div class="cd-prog"><div style="width:${pct}%"></div></div><p class="bk-hs">${pct}% de la col·lecció</p></div><div class="cd-sec">Índex</div><div class="cd-idx">${b.pages.map((p,i)=>`<button type="button" data-cdgo="${i+1}"><span class="t">${escapeHtml(p.name)}</span><span class="dots"></span><small>${p.have}/${p.total}</small></button>`).join('')||'<p class="st-empty">Encara no hi ha cromos.</p>'}</div><p class="bk-hs" style="text-align:center">Toca un equip, o llisca el dit cap a l’esquerra per passar pàgina.</p>`;
   } else {
-    const p=b.pages[pi-1]; title=p.name; sub=`${p.have} de ${p.total} cromos d’aquest equip`;
-    body=(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'');
+    const p=b.pages[pi-1]; sub=`Pàgina ${pi} de ${n}`;
+    body=`<h3 class="bk-h">${escapeHtml(p.name)}</h3><div class="bk-hs">${p.have} de ${p.total} cromos d’aquest equip</div>`+(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'')+`<div class="bk-pn">— ${pi} —</div>`;
   }
-  const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>📖 ${escapeHtml(title)}</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div><div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar l’àlbum</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
+  const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>Àlbum de cromos</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div><div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
   const go=d=>{ const np=CD.page+d; if(np<0||np>n) return; CD.page=np; cdOpenAlbum(d>0?'next':'prev'); };
   m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
     const nv=e.target.closest('[data-cdnav]'); if(nv) return go(Number(nv.dataset.cdnav));
