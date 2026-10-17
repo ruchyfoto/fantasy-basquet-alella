@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=86; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=87; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1897,7 +1897,7 @@ function whoPick(btn){
 
 /*CARDS-START*/
 /* Cromos coleccionables: sobre diari + extres pels minijocs (només diversió, sense punts del Fantasy) */
-var CD={data:null,filter:'all'};
+var CD={data:null,filter:'all',page:0,go:null};
 function cdEntity(k,id){ return k==='c'?(state.coaches||[]).find(x=>String(x.id)===String(id)):(state.players||[]).find(x=>String(x.id)===String(id)); }
 function cdInfo(k,id){
   const e=cdEntity(k,id); if(!e) return null;
@@ -1926,25 +1926,47 @@ function cdModal(id,inner){ let m=$(id); if(!m){ m=document.createElement('div')
 function cdCloseModal(m){ m.style.display='none'; if(!document.querySelector('.cd-modal[style*="flex"]')) document.body.style.overflow=''; }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.cd-modal').forEach(m=>{ if(m.style.display==='flex') cdCloseModal(m); }); });
 
-function cdOpenAlbum(){
-  const d=CD.data; if(!d) return; const own=cdOwnedMap(), items=(d.pool||[]).map(x=>({k:x.kind,id:x.id}));
+function cdBook(){
+  const d=CD.data, own=cdOwnedMap(), items=(d.pool||[]).map(x=>({k:x.kind,id:x.id}));
   Object.values(own).forEach(c=>{ if(!items.find(x=>x.k===c.kind&&String(x.id)===String(c.id))) items.push({k:c.kind,id:c.id}); });
-  const f=CD.filter, rows=items.map(x=>({...x,own:own[x.k+':'+x.id],info:cdInfo(x.k,x.id)})).filter(x=>x.info).filter(x=>f==='all'||(f==='p'&&x.k==='p')||(f==='c'&&x.k==='c')||(f==='miss'&&!x.own)||(f==='dup'&&x.own&&x.own.qty>1));
-  rows.sort((a,b)=>(a.k===b.k?0:a.k==='c'?-1:1)||String(a.info.team).localeCompare(String(b.info.team))||a.info.name.localeCompare(b.info.name));
-  const have=Object.keys(own).length, tot=items.length, pct=tot?Math.round(have*100/tot):0;
-  const tab=(k,t)=>`<button data-cdf="${k}" class="${f===k?'on':''}">${t}</button>`;
-  const m=cdModal('cdAlbum',`<div class="mg-box cd-box"><div class="mg-top"><b>📖 Àlbum de cromos</b><button data-cdx aria-label="Tanca">✕</button></div><div class="cd-prog"><div style="width:${pct}%"></div></div><p class="st-empty" style="margin:4px 0 8px">${have} de ${tot} cromos (${pct}%)</p><div class="cd-tabs">${tab('all','Tots')}${tab('p','Jugadors')}${tab('c','Entrenadors')}${tab('miss','Em falten')}${tab('dup','Repetits')}</div><div class="cd-grid">${rows.length?rows.map(x=>x.own?cdHtml(x.k,x.id,x.own.rarity,{qty:x.own.qty}):`<div class="cd miss" data-ck="${x.k}" data-cid="${x.id}"><div class="cd-ph">?</div><div class="cd-n">???</div><div class="cd-t">${escapeHtml(x.info.team)}</div></div>`).join(''):'<p class="st-empty">No hi ha cromos amb aquest filtre.</p>'}</div></div>`);
-  m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
-    const t=e.target.closest('[data-cdf]'); if(t){ CD.filter=t.dataset.cdf; return cdOpenAlbum(); }
-    const c=e.target.closest('.cd:not(.miss)'); if(c){ const o=own[c.dataset.ck+':'+c.dataset.cid]; if(o) cdBig(c.dataset.ck,c.dataset.cid,o); } };
+  const pages={}, order=[];
+  const pg=tid=>{ const key=String(tid||0); if(!pages[key]){ pages[key]={id:key,name:tid?(teamName(tid)||'Equip'):'Altres',coaches:[],players:[]}; order.push(key); } return pages[key]; };
+  items.forEach(x=>{ const info=cdInfo(x.k,x.id); if(!info) return; const e=cdEntity(x.k,x.id); const row={...x,own:own[x.k+':'+x.id],info};
+    if(x.k==='p') pg(e.real_team_id).players.push(row);
+    else { const ts=(state.coachTeams||[]).filter(r=>String(r.coach_id)===String(x.id)).map(r=>r.real_team_id); (ts.length?ts:[0]).forEach(t=>pg(t).coaches.push(row)); } });
+  const list=order.map(k=>pages[k]).sort((a,b)=>a.id==='0'?1:b.id==='0'?-1:a.name.localeCompare(b.name));
+  list.forEach(p=>{ p.players.sort((a,b)=>a.info.name.localeCompare(b.info.name)); p.coaches.sort((a,b)=>a.info.name.localeCompare(b.info.name)); const all=p.coaches.concat(p.players); p.have=all.filter(r=>r.own).length; p.total=all.length; });
+  return {pages:list,have:Object.keys(own).length,total:items.length};
 }
+function cdCell(r){ return r.own?cdHtml(r.k,r.id,r.own.rarity,{qty:r.own.qty}):`<div class="cd miss"><div class="cd-ph">?</div><div class="cd-n">???</div><div class="cd-t">${escapeHtml(r.info.team)}</div></div>`; }
+function cdOpenAlbum(dir){
+  if(!CD.data) return; if(typeof dir!=='string') dir='';
+  const b=cdBook(), n=b.pages.length, own=cdOwnedMap(); CD.page=Math.max(0,Math.min(CD.page||0,n)); const pi=CD.page;
+  let title='Àlbum de cromos', sub='', body;
+  if(pi===0){
+    const pct=b.total?Math.round(b.have*100/b.total):0; sub=`${b.have} de ${b.total} cromos (${pct}%)`;
+    body=`<div class="cd-prog"><div style="width:${pct}%"></div></div><div class="cd-sec">Índex</div><div class="cd-idx">${b.pages.map((p,i)=>`<button type="button" data-cdgo="${i+1}"><span>${escapeHtml(p.name)}</span><small>${p.have}/${p.total}</small><i style="width:${p.total?Math.round(p.have*100/p.total):0}%"></i></button>`).join('')||'<p class="st-empty">Encara no hi ha cromos.</p>'}</div><p class="st-empty">Toca un equip o llisca cap a l’esquerra per passar pàgina.</p>`;
+  } else {
+    const p=b.pages[pi-1]; title=p.name; sub=`${p.have} de ${p.total} cromos d’aquest equip`;
+    body=(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'');
+  }
+  const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>📖 ${escapeHtml(title)}</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div><div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar l’àlbum</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
+  const go=d=>{ const np=CD.page+d; if(np<0||np>n) return; CD.page=np; cdOpenAlbum(d>0?'next':'prev'); };
+  m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
+    const nv=e.target.closest('[data-cdnav]'); if(nv) return go(Number(nv.dataset.cdnav));
+    const g=e.target.closest('[data-cdgo]'); if(g){ CD.page=Number(g.dataset.cdgo); return cdOpenAlbum('next'); }
+    const c=e.target.closest('.cd:not(.miss)'); if(c){ const o=own[c.dataset.ck+':'+c.dataset.cid]; if(o) cdBig(c.dataset.ck,c.dataset.cid,o); } };
+  let sx=null; m.ontouchstart=e=>{ sx=e.touches[0].clientX; }; m.ontouchend=e=>{ if(sx===null) return; const dx=e.changedTouches[0].clientX-sx; sx=null; if(Math.abs(dx)>60) go(dx<0?1:-1); };
+  CD.go=go;
+}
+document.addEventListener('keydown',e=>{ const m=$('cdAlbum'); if(m&&m.style.display==='flex'&&CD.go){ if(e.key==='ArrowRight') CD.go(1); else if(e.key==='ArrowLeft') CD.go(-1); } });
 function cdBig(k,id,o){
   const m=cdModal('cdBig',`<div class="cd-bigwrap" data-cdx>${cdHtml(k,id,o.rarity,{qty:o.qty})}<p>${o.qty>1?`Tens ${o.qty} còpies d’aquest cromo.`:'Tens una còpia.'} Toca per tancar.</p></div>`);
   m.onclick=()=>cdCloseModal(m);
 }
 async function cdOpenPack(){
   const d=CD.data; if(!d||Number(d.packs)<1) return;
-  const m=cdModal('cdPack',`<div class="mg-box cd-box cd-pk"><div class="mg-top"><b>🎁 Sobre de cromos</b><button data-cdx aria-label="Tanca">✕</button></div><div id="pkStage"><button class="pk-pack" id="pkGo" type="button"><span>🏀</span><b>CB Alella</b><small>Toca per obrir</small></button></div></div>`);
+  const m=cdModal('cdPack',`<div class="mg-box cd-box cd-pk"><div class="mg-top"><b>🎁 Sobre de cromos</b><button data-cdx aria-label="Tanca">✕</button></div><div id="pkStage"><button class="pk-pack" id="pkGo" type="button"><span>🏀</span><b>CB Alella</b><small>Toca per obrir</small></button><button type="button" class="secondary" data-cdx style="margin:6px auto;display:block">Tancar</button></div></div>`);
   m.onclick=null;
   $('pkGo').onclick=async()=>{
     $('pkGo').disabled=true; let r;
