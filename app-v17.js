@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=83; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=84; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1694,7 +1694,7 @@ function mgOpen(game){
   $('mgCanvas').style.visibility=game==='who'?'hidden':''; $('mgWhoBox').style.display=game==='who'?'flex':'none'; $('mgWhoBox').innerHTML='';
   $('mgTime').textContent=30; $('mgScore').textContent=0; $('mgStreak').textContent=0; $('mgBest').textContent=MG.bests[game]??'–';
   mgTab('play');
-  if(game==='who') mgShowOver('Qui és?','Endevina el nom de cada jugador o entrenador del club a partir de la foto. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
+  if(game==='who') mgShowOver('Qui és?','Només veuràs un tros de la foto: endevina el nom de cada jugador o entrenador del club. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
   else { mgShowOver('Preparat?','Llisca el dit cap amunt per llançar. 30 segons: encerta tantes cistelles com puguis! Cada cistella val 2 punts i les ratxes sumen extra.','Jugar'); mgDraw(null); }
 }
 function mgClose(){ cancelAnimationFrame(MG.raf); whoStop(); MG.run=null; const m=$('mgModal'); if(m) m.style.display='none'; document.body.style.overflow=''; }
@@ -1878,13 +1878,15 @@ function whoNext(g){
   im.onerror=()=>{ g.bad.add(q.id); whoNext(g); };
   im.onload=()=>{
     if(MG.run!==g||g.ended) return;
+    const qy=Math.random()<.25?1:0, qx=Math.random()<.5?1:0; /* només es veu una quarta part; la meitat de dalt és més probable (hi ha la cara) */
     g.cur={q,opts}; g.lock=false;
-    $('mgWhoBox').innerHTML=`<div class="who-q">Quina persona és?</div><div class="who-img"><img src="${escapeHtml(q.photo)}" alt=""></div><div class="who-pop" id="whoPop"></div><div class="who-opts">${opts.map((o,i)=>`<button type="button" data-wo="${i}">${escapeHtml(o.name)}</button>`).join('')}</div>`;
+    $('mgWhoBox').innerHTML=`<div class="who-q">Quina persona és?</div><div class="who-img" id="whoImg"><img src="${escapeHtml(q.photo)}" alt="" style="left:${qx?-100:0}%;top:${qy?-100:0}%"></div><div class="who-pop" id="whoPop"></div><div class="who-opts">${opts.map((o,i)=>`<button type="button" data-wo="${i}">${escapeHtml(o.name)}</button>`).join('')}</div>`;
   };
   im.src=q.photo;
 }
 function whoPick(btn){
   const g=MG.run; if(!g||g.game!=='who'||g.lock||g.ended||!g.cur) return; g.lock=true; g.shots++;
+  const wi=$('whoImg'); if(wi) wi.classList.add('rev');
   const i=Number(btn.dataset.wo), ok=g.cur.opts[i].id===g.cur.q.id, pop=$('whoPop');
   if(ok){ g.streak++; const pts=10+Math.min(5,g.streak-1); g.score+=pts; g.makes++; btn.classList.add('ok'); if(pop) pop.textContent='+'+pts+(g.streak>=3?' 🔥':''); }
   else { g.streak=0; btn.classList.add('bad'); const k=g.cur.opts.findIndex(o=>o.id===g.cur.q.id); const c=$('mgWhoBox').querySelector(`[data-wo="${k}"]`); if(c) c.classList.add('ok'); if(pop) pop.textContent='Era '+g.cur.q.name; }
