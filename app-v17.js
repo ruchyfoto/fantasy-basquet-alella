@@ -533,7 +533,7 @@ function renderManage(){
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
   ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>${ctBlock(c)}`).join('')}
   <h4>👤 Usuaris, entrenadors i administradors</h4>
-  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button></div>`).join('')||'<small>Sense usuaris.</small>'}
+  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button><span class="mg-adj"><input class="mg-ap" placeholder="± Punts" inputmode="decimal"><input class="mg-ab" placeholder="± M€" inputmode="decimal"><input class="mg-ar" placeholder="Motiu (opcional)"><button class="primary" data-mg="adj">➕ Ajustar</button></span></div>`).join('')||'<small>Sense usuaris.</small>'}
   <h4>📜 Registre d’activitat (últims 30)</h4>
   ${(state.adminLog||[]).map(x=>{const d=x.detall||{};const what=[d.name,d.surname].filter(Boolean).join(' ')||d.user_id||d.id||'';return `<div class="mg-log"><small>${new Date(x.created_at).toLocaleString('ca-ES')} · <b>${escapeHtml(who(x.user_id))}</b> · ${escapeHtml(x.tabla)} ${escapeHtml(x.operacio)} · ${escapeHtml(String(what))}</small></div>`;}).join('')||'<small>Encara no hi ha activitat.</small>'}`;
 }
@@ -576,6 +576,11 @@ async function manageClick(e){
   else if(a==='delc'){ if(!confirm(`Retirar l’entrenador ${nom()}?\n\nSi algú el té fitxat, se li reemborsarà el seu valor de mercat.`)) return; ok=await adminRpc('admin_retire_coach',{p_id:Number(row.dataset.id)}); msg='Entrenador retirat.'; }
   else if(a==='role'){ ok=await adminRpc('admin_set_coach_assignment',{p_pin:'1234',p_user_id:row.dataset.uid,p_coach_id:v('.mg-c')?Number(v('.mg-c')):null}); msg='Rol d’entrenador actualitzat.'; }
   else if(a==='tbl'){ ok=await adminRpc('admin_set_table_person',{p_user_id:row.dataset.uid,p_on:row.dataset.tbl!=='1'}); msg='Llista de taula actualitzada.'; }
+  else if(a==='adj'){ const pts=num('.mg-ap'), bud=num('.mg-ab');
+    if((pts===null||isNaN(pts))&&(bud===null||isNaN(bud))) return alert('Escriu els punts i/o el pressupost a afegir (amb signe menys per restar).');
+    const who2=(row.querySelector('span')?.textContent||'aquest usuari').split('·')[0].trim();
+    if(!confirm(`Aplicar a ${who2}:\n${pts?(pts>0?'+':'')+pts+' punts\n':''}${bud?(bud>0?'+':'')+bud+' M€':''}`)) return;
+    try{ const r=await rpc('admin_adjust_user',{p_user_id:row.dataset.uid,p_points:pts&&!isNaN(pts)?pts:0,p_budget:bud&&!isNaN(bud)?bud:0,p_reason:v('.mg-ar')||null}); const t=await r.text(); if(!r.ok){ let m=t; try{m=JSON.parse(t).message||t;}catch{} return alert('⚠️ '+m); } ok=true; try{ msg=JSON.parse(t); }catch{ msg='Ajust aplicat.'; } }catch(e){ return alert('⚠️ '+e.message); } }
   else if(a==='adm'){ const fer=row.dataset.adm!=='1'; if(!confirm(fer?'Donar permisos d’administrador a aquest usuari?':'Treure els permisos d’administrador a aquest usuari?')) return; ok=await adminRpc('admin_set_admin',{p_user_id:row.dataset.uid,p_admin:fer}); msg='Permisos actualitzats.'; }
   if(ok){ setAdminMessage('✅ '+msg); await loadData(); await loadManage(); }
 }
@@ -1584,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=81; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=82; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
