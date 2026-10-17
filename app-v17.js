@@ -382,7 +382,7 @@ async function loadData(){
     await loadCoachContext();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
-    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); loadHistory(true); initMinigames(); initBot(); renderInstall(); renderInstall();
+    $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); loadHistory(true); initMinigames(); initCards(); initBot(); renderInstall(); renderInstall();
   }catch(e){console.error(e);$('connectionStatus').textContent='Error de connexió';$('homeStatus').innerHTML=`⚠️ <b>No s'han pogut carregar les dades.</b><br><small>${escapeHtml(e.message)}</small>`;}
 }
 
@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=85; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=86; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1831,7 +1831,7 @@ async function mgFinish(g){
     const r=await lgCall('submit_minigame_score',{p_game:gm,p_score:sc});
     MG.bests[gm]=r.best; MG.best=r.best; if(MG.game===gm) $('mgBest').textContent=r.best;
     if(r.new_record&&sc>0){ title='🏆 Nou rècord!'; confetti(); }
-    mgShowOver(title,msg+` El teu rècord: ${r.best}.`,'Torna-hi'); mgHomeCard();
+    mgShowOver(title,msg+` El teu rècord: ${r.best}.`+(r.pack_earned?' 🎁 Has guanyat un sobre de cromos!':''),'Torna-hi'); mgHomeCard(); if(r.pack_earned&&typeof loadCards==='function') loadCards();
   }catch(e){ mgShowOver(title,msg+' '+(/ràpid/i.test(e.message)?'Espera uns segons per desar la puntuació i torna a jugar.':'No s’ha pogut desar ('+e.message+').'),'Torna-hi'); }
 }
 async function mgHomeCard(){
@@ -1894,3 +1894,70 @@ function whoPick(btn){
   MG.whoT=setTimeout(()=>whoNext(g),ok?450:1000);
 }
 /*MG-END*/
+
+/*CARDS-START*/
+/* Cromos coleccionables: sobre diari + extres pels minijocs (només diversió, sense punts del Fantasy) */
+var CD={data:null,filter:'all'};
+function cdEntity(k,id){ return k==='c'?(state.coaches||[]).find(x=>String(x.id)===String(id)):(state.players||[]).find(x=>String(x.id)===String(id)); }
+function cdInfo(k,id){
+  const e=cdEntity(k,id); if(!e) return null;
+  let team='Entrenador';
+  if(k==='p') team=teamName(e.real_team_id)||''; else { const r=(state.coachTeams||[]).find(x=>String(x.coach_id)===String(id)); if(r) team='Entrenador · '+teamName(r.real_team_id); }
+  return {name:whoName(e),team,photo:e.photo_url||'logo.png'};
+}
+function cdHtml(k,id,rarity,opts){
+  opts=opts||{}; const i=cdInfo(k,id), r=rarity||'normal'; if(!i) return '';
+  const star=r==='gold'?'★ Or':r==='silver'?'★ Plata':'';
+  return `<div class="cd r-${r}" data-ck="${k}" data-cid="${id}"><div class="cd-ph"><img src="${escapeHtml(i.photo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div><div class="cd-n">${escapeHtml(i.name)}</div><div class="cd-t">${escapeHtml(i.team)}</div>${star?`<span class="cd-r">${star}</span>`:''}${opts.qty>1?`<span class="cd-q">×${opts.qty}</span>`:''}${opts.isNew?'<span class="cd-new">NOU</span>':''}</div>`;
+}
+async function loadCards(){
+  const card=$('cdCard'); if(!card) return;
+  try{ CD.data=await lgCall('get_my_cards'); }catch(e){ card.style.display='none'; return; }
+  card.style.display=''; renderCardsCard();
+}
+function cdOwnedMap(){ const m={}; ((CD.data&&CD.data.cards)||[]).forEach(c=>{ m[c.kind+':'+c.id]=c; }); return m; }
+function renderCardsCard(){
+  const d=CD.data; if(!d) return; const own=Object.keys(cdOwnedMap()).length, tot=(d.pool||[]).length||0, p=Number(d.packs||0);
+  $('cdSub').textContent=`Tens ${own} cromos de ${tot}. `+(p>0?`Tens ${p} ${p===1?'sobre':'sobres'} per obrir!`:'Torna demà per un sobre nou, o juga a un minijoc per guanyar-ne un d’extra.');
+  const b=$('cdOpenBtn'); b.disabled=p<1; b.textContent=p>0?`🎁 Obrir sobre${p>1?` (${p})`:''}`:'🎁 Cap sobre ara';
+}
+function cdModal(id,inner){ let m=$(id); if(!m){ m=document.createElement('div'); m.id=id; m.className='mg-modal cd-modal'; document.body.appendChild(m); m.addEventListener('click',e=>{ if(e.target===m||e.target.closest('[data-cdx]')) cdCloseModal(m); }); }
+  m.innerHTML=inner; m.style.display='flex'; document.body.style.overflow='hidden'; return m; }
+function cdCloseModal(m){ m.style.display='none'; if(!document.querySelector('.cd-modal[style*="flex"]')) document.body.style.overflow=''; }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.cd-modal').forEach(m=>{ if(m.style.display==='flex') cdCloseModal(m); }); });
+
+function cdOpenAlbum(){
+  const d=CD.data; if(!d) return; const own=cdOwnedMap(), items=(d.pool||[]).map(x=>({k:x.kind,id:x.id}));
+  Object.values(own).forEach(c=>{ if(!items.find(x=>x.k===c.kind&&String(x.id)===String(c.id))) items.push({k:c.kind,id:c.id}); });
+  const f=CD.filter, rows=items.map(x=>({...x,own:own[x.k+':'+x.id],info:cdInfo(x.k,x.id)})).filter(x=>x.info).filter(x=>f==='all'||(f==='p'&&x.k==='p')||(f==='c'&&x.k==='c')||(f==='miss'&&!x.own)||(f==='dup'&&x.own&&x.own.qty>1));
+  rows.sort((a,b)=>(a.k===b.k?0:a.k==='c'?-1:1)||String(a.info.team).localeCompare(String(b.info.team))||a.info.name.localeCompare(b.info.name));
+  const have=Object.keys(own).length, tot=items.length, pct=tot?Math.round(have*100/tot):0;
+  const tab=(k,t)=>`<button data-cdf="${k}" class="${f===k?'on':''}">${t}</button>`;
+  const m=cdModal('cdAlbum',`<div class="mg-box cd-box"><div class="mg-top"><b>📖 Àlbum de cromos</b><button data-cdx aria-label="Tanca">✕</button></div><div class="cd-prog"><div style="width:${pct}%"></div></div><p class="st-empty" style="margin:4px 0 8px">${have} de ${tot} cromos (${pct}%)</p><div class="cd-tabs">${tab('all','Tots')}${tab('p','Jugadors')}${tab('c','Entrenadors')}${tab('miss','Em falten')}${tab('dup','Repetits')}</div><div class="cd-grid">${rows.length?rows.map(x=>x.own?cdHtml(x.k,x.id,x.own.rarity,{qty:x.own.qty}):`<div class="cd miss" data-ck="${x.k}" data-cid="${x.id}"><div class="cd-ph">?</div><div class="cd-n">???</div><div class="cd-t">${escapeHtml(x.info.team)}</div></div>`).join(''):'<p class="st-empty">No hi ha cromos amb aquest filtre.</p>'}</div></div>`);
+  m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
+    const t=e.target.closest('[data-cdf]'); if(t){ CD.filter=t.dataset.cdf; return cdOpenAlbum(); }
+    const c=e.target.closest('.cd:not(.miss)'); if(c){ const o=own[c.dataset.ck+':'+c.dataset.cid]; if(o) cdBig(c.dataset.ck,c.dataset.cid,o); } };
+}
+function cdBig(k,id,o){
+  const m=cdModal('cdBig',`<div class="cd-bigwrap" data-cdx>${cdHtml(k,id,o.rarity,{qty:o.qty})}<p>${o.qty>1?`Tens ${o.qty} còpies d’aquest cromo.`:'Tens una còpia.'} Toca per tancar.</p></div>`);
+  m.onclick=()=>cdCloseModal(m);
+}
+async function cdOpenPack(){
+  const d=CD.data; if(!d||Number(d.packs)<1) return;
+  const m=cdModal('cdPack',`<div class="mg-box cd-box cd-pk"><div class="mg-top"><b>🎁 Sobre de cromos</b><button data-cdx aria-label="Tanca">✕</button></div><div id="pkStage"><button class="pk-pack" id="pkGo" type="button"><span>🏀</span><b>CB Alella</b><small>Toca per obrir</small></button></div></div>`);
+  m.onclick=null;
+  $('pkGo').onclick=async()=>{
+    $('pkGo').disabled=true; let r;
+    try{ r=await lgCall('open_pack'); }catch(e){ alert('⚠️ '+e.message); cdCloseModal(m); loadCards(); return; }
+    const cards=(r&&r.cards)||[]; let left=cards.length;
+    $('pkStage').innerHTML=`<p class="st-empty" id="pkHint">Toca cada cromo per girar-lo</p><div class="pk-cards">${cards.map((c,i)=>`<div class="pk-flip" data-pi="${i}"><div class="pk-in"><div class="pk-back">🏀</div><div class="pk-front">${cdHtml(c.kind,c.id,c.rarity,{isNew:c.new})}</div></div></div>`).join('')}</div><div id="pkEnd"></div>`;
+    $('pkStage').querySelectorAll('.pk-flip').forEach(el=>el.onclick=()=>{
+      if(el.classList.contains('on')) return; el.classList.add('on'); const c=cards[Number(el.dataset.pi)]; if(c.rarity!=='normal'||c.new) confetti(); left--;
+      if(left===0){ $('pkHint').textContent=`Tens ${r.packs_left||0} ${r.packs_left===1?'sobre':'sobres'} més.`; $('pkEnd').innerHTML=`<button class="primary" id="pkAlbum" type="button">📖 Veure l’àlbum</button> <button class="secondary" data-cdx type="button">Tancar</button>`; $('pkAlbum').onclick=async()=>{ cdCloseModal(m); await loadCards(); cdOpenAlbum(); }; loadCards(); } });
+  };
+}
+function initCards(){
+  const o=$('cdOpenBtn'), a=$('cdAlbumBtn'); if(o&&!o._cd){ o._cd=1; o.onclick=cdOpenPack; } if(a&&!a._cd){ a._cd=1; a.onclick=()=>{ if(CD.data) cdOpenAlbum(); }; }
+  loadCards();
+}
+/*CARDS-END*/
