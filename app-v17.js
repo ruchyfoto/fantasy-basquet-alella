@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=90; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=91; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1692,10 +1692,10 @@ function mgOpen(game){
   $('mgModal').style.display='flex'; document.body.style.overflow='hidden';
   $('mgTopTitle').textContent=game==='who'?'🧑 Qui és?':game==='hl'?'⚖️ Més o menys':'🏀 Llançaments lliures';
   $('mgCanvas').style.visibility=game==='fts'?'':'hidden'; $('mgWhoBox').style.display=game==='fts'?'none':'flex'; $('mgWhoBox').innerHTML='';
-  $('mgTime').textContent=30; $('mgScore').textContent=0; $('mgStreak').textContent=0; $('mgBest').textContent=MG.bests[game]??'–';
+  $('mgTime').textContent=game==='hl'?60:30; $('mgScore').textContent=0; $('mgStreak').textContent=0; $('mgBest').textContent=MG.bests[game]??'–';
   mgTab('play');
   if(game==='who') mgShowOver('Qui és?','Només veuràs un tros de la foto: endevina el nom de cada jugador o entrenador del club. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
-  else if(game==='hl') mgShowOver('Més o menys','Veuràs dos jugadors: toca el que té MÉS punts al Fantasy o MÉS valor de mercat. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
+  else if(game==='hl') mgShowOver('Més o menys','Veuràs dos jugadors: toca el que té MÉS punts al Fantasy o MÉS valor de mercat. 1 minut: 10 punts per encert i les ratxes sumen extra!','Jugar');
   else { mgShowOver('Preparat?','Llisca el dit cap amunt per llançar. 30 segons: encerta tantes cistelles com puguis! Cada cistella val 2 punts i les ratxes sumen extra.','Jugar'); mgDraw(null); }
 }
 function mgClose(){ cancelAnimationFrame(MG.raf); whoStop(); MG.run=null; const m=$('mgModal'); if(m) m.style.display='none'; document.body.style.overflow=''; }
@@ -1865,7 +1865,7 @@ function whoStart(){
 }
 function whoTick(g){
   if(MG.run!==g) return clearInterval(g.timer);
-  const left=Math.max(0,30-(performance.now()-g.t0)/1000); $('mgTime').textContent=Math.ceil(left);
+  const left=Math.max(0,(g.dur||30)-(performance.now()-g.t0)/1000); $('mgTime').textContent=Math.ceil(left);
   if(left<=0&&!g.ended){ g.ended=true; clearInterval(g.timer); if(MG.whoT) clearTimeout(MG.whoT); MG.run=null; mgFinish(g); }
 }
 function whoNext(g){
@@ -1901,15 +1901,15 @@ async function hlStart(){
   const pts={}; try{ const r=await rpc('get_player_points',{}); if(r&&r.ok) Object.assign(pts,await r.json().catch(()=>({}))); }catch{}
   const all=(state.players||[]).filter(p=>p.is_active!==false).map(p=>({id:p.id,name:whoName(p),photo:p.photo_url||'logo.png',team:teamName(p.real_team_id)||'',pts:pts[p.id]!==undefined&&pts[p.id]!==null?Number(pts[p.id]):null,val:Number(p.current_value)})).filter(x=>x.name);
   const byVal=all.filter(x=>Number.isFinite(x.val)&&x.val>0), byPts=all.filter(x=>x.pts!==null&&Number.isFinite(x.pts));
-  const okP=new Set(byPts.map(x=>x.pts)).size>=4&&byPts.length>=6, okV=new Set(byVal.map(x=>x.val)).size>=4&&byVal.length>=6;
+  const okP=new Set(byPts.map(x=>x.pts)).size>=3&&byPts.length>=4, okV=new Set(byVal.map(x=>x.val)).size>=4&&byVal.length>=6;
   if(!okP&&!okV){ MG.run=null; mgShowOver('Encara no es pot jugar','Falten dades de jugadors per fer aquest joc.','Torna-ho a provar'); return; }
-  const g={game:'hl',byVal:okV?byVal:[],byPts:okP?byPts:[],score:0,streak:0,makes:0,shots:0,t0:performance.now(),ended:false,lock:false,cur:null};
+  const g={game:'hl',dur:60,byVal:okV?byVal:[],byPts:okP?byPts:[],score:0,streak:0,makes:0,shots:0,t0:performance.now(),ended:false,lock:false,cur:null};
   MG.run=g; $('mgScore').textContent=0; $('mgStreak').textContent=0;
   g.timer=setInterval(()=>whoTick(g),200); whoTick(g); hlNext(g);
 }
 function hlNext(g){
   if(MG.run!==g||g.ended) return;
-  const mode=(g.byPts.length&&(!g.byVal.length||Math.random()<.5))?'pts':'val', list=mode==='pts'?g.byPts:g.byVal, key=mode;
+  const mode=g.byPts.length?'pts':'val', list=mode==='pts'?g.byPts:g.byVal, key=mode;
   const a=list[Math.floor(Math.random()*list.length)];
   let cands=[]; for(let i=0;i<30&&cands.length<4;i++){ const b=list[Math.floor(Math.random()*list.length)]; if(b.id!==a.id&&b[key]!==a[key]&&!cands.includes(b)) cands.push(b); }
   if(!cands.length){ return hlNext(g); }
@@ -1925,7 +1925,7 @@ function hlPick(btn){
   if(ok){ g.streak++; const pts=10+Math.min(5,g.streak-1); g.score+=pts; g.makes++; if(pop) pop.textContent='+'+pts+(g.streak>=3?' 🔥':''); }
   else { g.streak=0; btn.classList.add('bad'); if(pop) pop.textContent='Ho sento!'; }
   $('mgScore').textContent=g.score; $('mgStreak').textContent=g.streak;
-  MG.whoT=setTimeout(()=>hlNext(g),ok?700:1300);
+  MG.whoT=setTimeout(()=>hlNext(g),ok?1600:2400);
 }
 /*MG-END*/
 
