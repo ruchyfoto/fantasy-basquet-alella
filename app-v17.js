@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=89; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=90; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1682,19 +1682,20 @@ function mgEnsureDom(){
   <div class="mg-stage"><canvas id="mgCanvas" width="360" height="520"></canvas><div class="mg-who" id="mgWhoBox" style="display:none"></div><div class="mg-over" id="mgOver"><div><h3 id="mgTitle">Preparat?</h3><p id="mgMsg">Llisca el dit cap amunt per llançar. 30 segons: encerta tantes cistelles com puguis! Cada cistella val 2 punts i les ratxes sumen extra.</p><button class="primary" id="mgGo">Jugar</button></div></div></div></div>
   <div id="mgRank" style="display:none"><p class="st-empty">Carregant…</p></div></div>`;
   document.body.appendChild(m);
-  $('mgClose').onclick=mgClose; $('mgGo').onclick=mgStart; $('mgWhoBox').addEventListener('click',e=>{ const b=e.target.closest('[data-wo]'); if(b) whoPick(b); });
+  $('mgClose').onclick=mgClose; $('mgGo').onclick=mgStart; $('mgWhoBox').addEventListener('click',e=>{ const b=e.target.closest('[data-wo]'); if(b) return whoPick(b); const h=e.target.closest('[data-ho]'); if(h) hlPick(h); });
   m.addEventListener('click',e=>{ if(e.target===m) mgClose(); const t=e.target.closest('[data-mgt]'); if(t) mgTab(t.dataset.mgt); });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&m.style.display!=='none') mgClose(); });
   mgBind();
 }
 function mgOpen(game){
-  game=game==='who'?'who':'fts'; mgEnsureDom(); whoStop(); cancelAnimationFrame(MG.raf); MG.run=null; MG.game=game;
+  game=(game==='who'||game==='hl')?game:'fts'; mgEnsureDom(); whoStop(); cancelAnimationFrame(MG.raf); MG.run=null; MG.game=game;
   $('mgModal').style.display='flex'; document.body.style.overflow='hidden';
-  $('mgTopTitle').textContent=game==='who'?'🧑 Qui és?':'🏀 Llançaments lliures';
-  $('mgCanvas').style.visibility=game==='who'?'hidden':''; $('mgWhoBox').style.display=game==='who'?'flex':'none'; $('mgWhoBox').innerHTML='';
+  $('mgTopTitle').textContent=game==='who'?'🧑 Qui és?':game==='hl'?'⚖️ Més o menys':'🏀 Llançaments lliures';
+  $('mgCanvas').style.visibility=game==='fts'?'':'hidden'; $('mgWhoBox').style.display=game==='fts'?'none':'flex'; $('mgWhoBox').innerHTML='';
   $('mgTime').textContent=30; $('mgScore').textContent=0; $('mgStreak').textContent=0; $('mgBest').textContent=MG.bests[game]??'–';
   mgTab('play');
   if(game==='who') mgShowOver('Qui és?','Només veuràs un tros de la foto: endevina el nom de cada jugador o entrenador del club. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
+  else if(game==='hl') mgShowOver('Més o menys','Veuràs dos jugadors: toca el que té MÉS punts al Fantasy o MÉS valor de mercat. 30 segons: 10 punts per encert i les ratxes sumen extra!','Jugar');
   else { mgShowOver('Preparat?','Llisca el dit cap amunt per llançar. 30 segons: encerta tantes cistelles com puguis! Cada cistella val 2 punts i les ratxes sumen extra.','Jugar'); mgDraw(null); }
 }
 function mgClose(){ cancelAnimationFrame(MG.raf); whoStop(); MG.run=null; const m=$('mgModal'); if(m) m.style.display='none'; document.body.style.overflow=''; }
@@ -1721,6 +1722,7 @@ function mgHoop(g){ const sc=g.score, hc=g.hc;
   return {x:amp?Math.sin(hc*sp)*amp:0, z:sc>=14?Math.sin(hc*.65)*.7:0}; }
 function mgStart(){
   if(MG.game==='who') return whoStart();
+  if(MG.game==='hl') return hlStart();
   mgEnsureDom(); cancelAnimationFrame(MG.raf);
   $('mgOver').style.display='none';
   MG.run={t0:performance.now(),score:0,streak:0,ball:null,msg:'',msgT:0,last:performance.now(),ended:false,shots:0,makes:0,drag:null,hc:0,left:30,netT:-9};
@@ -1824,8 +1826,8 @@ function mgDraw(g,left){
   if(g&&!g.shots&&!g.ball&&left>28){ c.font='600 14px system-ui,sans-serif'; c.textAlign='center'; c.fillStyle='rgba(255,255,255,.95)'; c.fillText('⬆ Llisca cap amunt per llançar',180,505); }
 }
 async function mgFinish(g){
-  const gm=g.game==='who'?'who':'fts', sc=Math.min(gm==='who'?400:150,g.score);
-  let msg=gm==='who'?`${g.makes} encerts de ${g.shots} fotos · ${sc} punts.`:`${g.makes} cistelles de ${g.shots} llançaments · ${sc} punts.`, title=sc>=(gm==='who'?150:30)?'Increïble!':sc>=(gm==='who'?70:15)?'Bona partida!':'Fi de la partida';
+  const gm=g.game==='who'?'who':g.game==='hl'?'hl':'fts', sc=Math.min(gm==='fts'?150:400,g.score);
+  let msg=gm==='who'?`${g.makes} encerts de ${g.shots} fotos · ${sc} punts.`:gm==='hl'?`${g.makes} encerts de ${g.shots} comparacions · ${sc} punts.`:`${g.makes} cistelles de ${g.shots} llançaments · ${sc} punts.`, title=sc>=(gm==='fts'?30:150)?'Increïble!':sc>=(gm==='fts'?15:70)?'Bona partida!':'Fi de la partida';
   mgShowOver(title,msg+' Desant…','Torna-hi');
   try{
     const r=await lgCall('submit_minigame_score',{p_game:gm,p_score:sc});
@@ -1835,14 +1837,14 @@ async function mgFinish(g){
   }catch(e){ mgShowOver(title,msg+' '+(/ràpid/i.test(e.message)?'Espera uns segons per desar la puntuació i torna a jugar.':'No s’ha pogut desar ('+e.message+').'),'Torna-hi'); }
 }
 async function mgHomeCard(){
-  for(const [gm,id] of [['fts','mgBestHome'],['who','mgBestWho']]){
+  for(const [gm,id] of [['fts','mgBestHome'],['who','mgBestWho'],['hl','mgBestHl']]){
     const el=$(id); if(!el) continue;
     try{ const d=await lgCall('get_minigame_ranking',{p_game:gm}); const me=((d&&d.top)||[]).find(r=>r.me);
       if(me){ MG.bests[gm]=me.best; el.textContent=`El teu rècord: ${me.best} pts · posició ${me.pos}`; if(MG.game===gm){ const bb=$('mgBest'); if(bb) bb.textContent=me.best; } }
       else el.textContent='Encara no has jugat. A per la primera puntuació!'; }catch{ el.textContent='Només diversió: no suma punts al Fantasy.'; }
   }
 }
-function initMinigames(){ const b=$('mgPlayBtn'), w=$('mgWhoBtn'); if(b&&!b._mg){ b._mg=1; b.onclick=()=>mgOpen('fts'); } if(w&&!w._mg){ w._mg=1; w.onclick=()=>mgOpen('who'); } mgHomeCard(); }
+function initMinigames(){ const h=$('mgHlBtn'); if(h&&!h._mg){ h._mg=1; h.onclick=()=>mgOpen('hl'); } const b=$('mgPlayBtn'), w=$('mgWhoBtn'); if(b&&!b._mg){ b._mg=1; b.onclick=()=>mgOpen('fts'); } if(w&&!w._mg){ w._mg=1; w.onclick=()=>mgOpen('who'); } mgHomeCard(); }
 /* ===== Joc "Qui és?" (foto → nom, 30 s) ===== */
 function whoName(x){ const t=s=>String(s||'').toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase()).trim(); return (t(x.name)+' '+t(x.surname)).trim(); }
 function whoPool(){
@@ -1892,6 +1894,38 @@ function whoPick(btn){
   else { g.streak=0; btn.classList.add('bad'); const k=g.cur.opts.findIndex(o=>o.id===g.cur.q.id); const c=$('mgWhoBox').querySelector(`[data-wo="${k}"]`); if(c) c.classList.add('ok'); if(pop) pop.textContent='Era '+g.cur.q.name; }
   $('mgScore').textContent=g.score; $('mgStreak').textContent=g.streak;
   MG.whoT=setTimeout(()=>whoNext(g),ok?450:1000);
+}
+/* ===== Joc "Més o menys" (dos jugadors: qui té més punts / més valor, 30 s) ===== */
+async function hlStart(){
+  mgEnsureDom(); whoStop(); $('mgOver').style.display='none';
+  const pts={}; try{ const r=await rpc('get_player_points',{}); if(r&&r.ok) Object.assign(pts,await r.json().catch(()=>({}))); }catch{}
+  const all=(state.players||[]).filter(p=>p.is_active!==false).map(p=>({id:p.id,name:whoName(p),photo:p.photo_url||'logo.png',team:teamName(p.real_team_id)||'',pts:pts[p.id]!==undefined&&pts[p.id]!==null?Number(pts[p.id]):null,val:Number(p.current_value)})).filter(x=>x.name);
+  const byVal=all.filter(x=>Number.isFinite(x.val)&&x.val>0), byPts=all.filter(x=>x.pts!==null&&Number.isFinite(x.pts));
+  const okP=new Set(byPts.map(x=>x.pts)).size>=4&&byPts.length>=6, okV=new Set(byVal.map(x=>x.val)).size>=4&&byVal.length>=6;
+  if(!okP&&!okV){ MG.run=null; mgShowOver('Encara no es pot jugar','Falten dades de jugadors per fer aquest joc.','Torna-ho a provar'); return; }
+  const g={game:'hl',byVal:okV?byVal:[],byPts:okP?byPts:[],score:0,streak:0,makes:0,shots:0,t0:performance.now(),ended:false,lock:false,cur:null};
+  MG.run=g; $('mgScore').textContent=0; $('mgStreak').textContent=0;
+  g.timer=setInterval(()=>whoTick(g),200); whoTick(g); hlNext(g);
+}
+function hlNext(g){
+  if(MG.run!==g||g.ended) return;
+  const mode=(g.byPts.length&&(!g.byVal.length||Math.random()<.5))?'pts':'val', list=mode==='pts'?g.byPts:g.byVal, key=mode;
+  const a=list[Math.floor(Math.random()*list.length)];
+  let cands=[]; for(let i=0;i<30&&cands.length<4;i++){ const b=list[Math.floor(Math.random()*list.length)]; if(b.id!==a.id&&b[key]!==a[key]&&!cands.includes(b)) cands.push(b); }
+  if(!cands.length){ return hlNext(g); }
+  cands.sort((x,y)=>Math.abs(x[key]-a[key])-Math.abs(y[key]-a[key])); const b=cands[0];
+  const pair=Math.random()<.5?[a,b]:[b,a]; g.cur={mode,pair}; g.lock=false;
+  $('mgWhoBox').innerHTML=`<div class="who-q">Qui té més ${mode==='pts'?'punts al Fantasy':'valor de mercat'}?</div><div class="hl-pair">${pair.map((o,i)=>`<button type="button" class="hl-c" data-ho="${i}"><span class="hl-ph"><img src="${escapeHtml(o.photo)}" alt="" onerror="this.onerror=null;this.src='logo.png'"></span><b>${escapeHtml(o.name)}</b><small>${escapeHtml(o.team)}</small><em class="hl-v">&nbsp;</em></button>`).join('')}</div><div class="who-pop" id="whoPop"></div>`;
+}
+function hlPick(btn){
+  const g=MG.run; if(!g||g.game!=='hl'||g.lock||g.ended||!g.cur) return; g.lock=true; g.shots++;
+  const {mode,pair}=g.cur, i=Number(btn.dataset.ho), win=pair[0][mode]>pair[1][mode]?0:1, ok=i===win, pop=$('whoPop');
+  const fmtv=o=>mode==='pts'?f1(o.pts)+' pts':money(o.val);
+  $('mgWhoBox').querySelectorAll('[data-ho]').forEach(b=>{ const k=Number(b.dataset.ho); b.querySelector('.hl-v').textContent=fmtv(pair[k]); if(k===win) b.classList.add('ok'); });
+  if(ok){ g.streak++; const pts=10+Math.min(5,g.streak-1); g.score+=pts; g.makes++; if(pop) pop.textContent='+'+pts+(g.streak>=3?' 🔥':''); }
+  else { g.streak=0; btn.classList.add('bad'); if(pop) pop.textContent='Ho sento!'; }
+  $('mgScore').textContent=g.score; $('mgStreak').textContent=g.streak;
+  MG.whoT=setTimeout(()=>hlNext(g),ok?700:1300);
 }
 /*MG-END*/
 
