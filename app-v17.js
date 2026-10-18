@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=91; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=92; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1850,7 +1850,7 @@ function whoName(x){ const t=s=>String(s||'').toLowerCase().replace(/(^|[\s'’-
 function whoPool(){
   const seen=new Set(), out=[];
   (state.players||[]).filter(p=>p.photo_url&&String(p.photo_url).trim().length>4&&!/logo|placeholder/i.test(String(p.photo_url))&&p.is_active!==false).forEach(p=>out.push({id:'p'+p.id,photo:p.photo_url,name:whoName(p),k:'p'}));
-  (state.coaches||[]).filter(c=>c.photo_url&&String(c.photo_url).includes('/storage/v1/')&&!/logo|placeholder/i.test(String(c.photo_url))&&c.is_active!==false).forEach(c=>out.push({id:'c'+c.id,photo:c.photo_url,name:whoName(c),k:'c'}));
+  (state.coaches||[]).filter(c=>c.is_active!==false).forEach(c=>out.push({id:'c'+c.id,photo:cdCoachPhoto(c),name:whoName(c),k:'c'}));
   return out.filter(x=>x.name&&!seen.has(x.name.toLowerCase())&&seen.add(x.name.toLowerCase()));
 }
 function whoShuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
@@ -1933,11 +1933,12 @@ function hlPick(btn){
 /* Cromos coleccionables: sobre diari + extres pels minijocs (només diversió, sense punts del Fantasy) */
 var CD={data:null,filter:'all',page:0,go:null};
 function cdEntity(k,id){ return k==='c'?(state.coaches||[]).find(x=>String(x.id)===String(id)):(state.players||[]).find(x=>String(x.id)===String(id)); }
+function cdCoachPhoto(c){ return (c.photo_url&&String(c.photo_url).includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`; }
 function cdInfo(k,id){
   const e=cdEntity(k,id); if(!e) return null;
   let team='Entrenador';
   if(k==='p') team=teamName(e.real_team_id)||''; else { const r=(state.coachTeams||[]).find(x=>String(x.coach_id)===String(id)); if(r) team='Entrenador · '+teamName(r.real_team_id); }
-  return {name:whoName(e),team,photo:e.photo_url||'logo.png'};
+  return {name:whoName(e),team,photo:k==='c'?cdCoachPhoto(e):(e.photo_url||'logo.png')};
 }
 function cdHtml(k,id,rarity,opts){
   opts=opts||{}; const i=cdInfo(k,id), r=rarity||'normal'; if(!i) return '';
