@@ -1589,7 +1589,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=88; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=89; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1908,7 +1908,7 @@ function cdInfo(k,id){
 function cdHtml(k,id,rarity,opts){
   opts=opts||{}; const i=cdInfo(k,id), r=rarity||'normal'; if(!i) return '';
   const star=r==='gold'?'★ Or':r==='silver'?'★ Plata':'';
-  return `<div class="cd r-${r}" data-ck="${k}" data-cid="${id}"><div class="cd-ph"><img src="${escapeHtml(i.photo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div><div class="cd-n">${escapeHtml(i.name)}</div><div class="cd-t">${escapeHtml(i.team)}</div>${star?`<span class="cd-r">${star}</span>`:''}${opts.qty>1?`<span class="cd-q">×${opts.qty}</span>`:''}${opts.isNew?'<span class="cd-new">NOU</span>':''}</div>`;
+  return `<div class="cd r-${r}" data-ck="${k}" data-cdid="${id}"><div class="cd-ph"><img src="${escapeHtml(i.photo)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div><div class="cd-n">${escapeHtml(i.name)}</div><div class="cd-t">${escapeHtml(i.team)}</div>${star?`<span class="cd-r">${star}</span>`:''}${opts.qty>1?`<span class="cd-q">×${opts.qty}</span>`:''}${opts.isNew?'<span class="cd-new">NOU</span>':''}</div>`;
 }
 async function loadCards(){
   const card=$('cdCard'); if(!card) return;
@@ -1948,14 +1948,14 @@ function cdOpenAlbum(dir){
     body=`<div class="bk-cover"><img src="logo.png" alt="" onerror="this.style.display='none'"><div class="bk-script">Àlbum de cromos</div><div class="bk-sub">Fantasy Bàsquet Alella</div><div class="bk-stamp"><b>${b.have}</b><span>de ${b.total}</span></div><div class="cd-prog"><div style="width:${pct}%"></div></div><p class="bk-hs">${pct}% de la col·lecció</p></div><div class="cd-sec">Índex</div><div class="cd-idx">${b.pages.map((p,i)=>`<button type="button" data-cdgo="${i+1}"><span class="t">${escapeHtml(p.name)}</span><span class="dots"></span><small>${p.have}/${p.total}</small></button>`).join('')||'<p class="st-empty">Encara no hi ha cromos.</p>'}</div><p class="bk-hs" style="text-align:center">Toca un equip, o llisca el dit cap a l’esquerra per passar pàgina.</p>`;
   } else {
     const p=b.pages[pi-1]; sub=`Pàgina ${pi} de ${n}`;
-    body=`<h3 class="bk-h">${escapeHtml(p.name)}</h3><div class="bk-hs">${p.have} de ${p.total} cromos d’aquest equip</div>`+(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'')+`<div class="bk-pn">— ${pi} —</div>`;
+    body=`<h3 class="bk-h">${escapeHtml(p.name)}</h3><div class="bk-hs">${p.have} de ${p.total} cromos d’aquest equip · toca un cromo per veure’n les estadístiques</div>`+(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'')+`<div class="bk-pn">— ${pi} —</div>`;
   }
   const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>Àlbum de cromos</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div><div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
   const go=d=>{ const np=CD.page+d; if(np<0||np>n) return; CD.page=np; cdOpenAlbum(d>0?'next':'prev'); };
   m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
     const nv=e.target.closest('[data-cdnav]'); if(nv) return go(Number(nv.dataset.cdnav));
     const g=e.target.closest('[data-cdgo]'); if(g){ CD.page=Number(g.dataset.cdgo); return cdOpenAlbum('next'); }
-    const c=e.target.closest('.cd:not(.miss)'); if(c){ const o=own[c.dataset.ck+':'+c.dataset.cid]; if(o) cdBig(c.dataset.ck,c.dataset.cid,o); } };
+    const c=e.target.closest('.cd:not(.miss)'); if(c){ const id=Number(c.dataset.cdid), pgx=pi>0?b.pages[pi-1]:null; if(c.dataset.ck==='c') openStats(id,'coach',pgx&&pgx.id!=='0'?pgx.id:null); else openStats(id); } };
   let sx=null; m.ontouchstart=e=>{ sx=e.touches[0].clientX; }; m.ontouchend=e=>{ if(sx===null) return; const dx=e.changedTouches[0].clientX-sx; sx=null; if(Math.abs(dx)>60) go(dx<0?1:-1); };
   CD.go=go;
 }
