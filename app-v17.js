@@ -161,6 +161,7 @@ function renderTeam(){
   $('teamCoaches').innerHTML=cs+Array(Math.max(0,2-state.rosterCoaches.length)).fill('<div class="bench-card empty" onclick="goMarket(\'coaches\')">➕ Fitxar entrenador</div>').join('');
   const captain=state.rosterPlayers.find(x=>x.is_captain), cp=captain?state.players.find(p=>String(p.id)===String(captain.player_id)):null;
   $('captainName').textContent=cp?`${cp.name} ${cp.surname||''}`.trim():'pendent';
+  { const w=$('capWarn'); if(w) w.style.display=(state.rosterPlayers.length&&!cp)?'':'none'; }
   bindActions();
 }
 async function loadExtras(){
@@ -1589,7 +1590,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=92; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=93; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
