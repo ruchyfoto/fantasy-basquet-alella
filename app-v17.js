@@ -106,7 +106,7 @@ function playerCard(p,inTeam=false){
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
-  return `<article class="player-card${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><div class="player-pts">⭐ Punts a la plantilla: <b>${f1(state.pts?.[p.id]||0)}</b></div><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}<span class="pc-num"><i>#</i>${escapeHtml(String(dorsal).replace(/\.0$/,''))}</span><span class="pc-team">${escapeHtml(teamName(p.real_team_id))}</span>${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}</div><div class="player-info"><div class="player-number-line"><span class="player-number-label">DORSAL</span><strong class="player-number">#${escapeHtml(String(dorsal).replace(/\.0$/,''))}</strong></div><h3>${escapeHtml(p.name)} ${escapeHtml(p.surname||'')}</h3><div class="player-pts">⭐ Punts a la plantilla: <b>${f1(state.pts?.[p.id]||0)}</b></div><span class="player-team">🏀 ${escapeHtml(teamName(p.real_team_id))}</span>${p.category?`<span class="player-category">${escapeHtml(p.category)}</span>`:''}</div><div class="player-meta"><div><small>Valor</small><b>${money(p.current_value)}</b></div><div><small>Estat</small><b>${isCaptain?'⭐ Capità':owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
 }
 function coachCard(c,realTeamId,inTeam=false){
   const relation=state.coachTeams.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -115,7 +115,7 @@ function coachCard(c,realTeamId,inTeam=false){
   if(!relation)return '';
   const coachPhoto=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
   const owned=state.rosterCoaches.some(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(realTeamId));
-  return `<article class="player-card" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" data-ph="🧑‍🏫" onerror="fixImageError(this)"></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" data-ph="🧑‍🏫" onerror="fixImageError(this)"><span class="pc-team">${escapeHtml(teamName(realTeamId))}</span></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
 }
 
 function render(){
@@ -247,9 +247,14 @@ async function renderRanking(){
     const rows=JSON.parse(txt||'[]');
     const isMine=x=>String(x.fantasy_team_id)===String(state.teamId), fmt=v=>Number(v||0).toFixed(1).replace('.',','), ord=n=>({1:'1r',2:'2n',3:'3r',4:'4t'}[n]||n+'è');
     const me=$('rankingMe'), idx=rows.findIndex(isMine);
-    ['myPoints','myPoints2'].forEach(k=>{ const el=$(k); if(el) el.textContent=fmt(idx>=0?rows[idx].total_points:0); });
+    ['myPoints','myPoints2'].forEach(k=>{ const el=$(k); if(el) polishCount(el,idx>=0?Number(rows[idx].total_points||0):0,fmt); });
+    { const hp=$('heroPos'); if(hp) hp.textContent=idx>=0?ord(idx+1):'—'; polishRankMove(idx>=0?idx+1:0); }
     if(me){ if(idx<0) me.innerHTML=''; else { const pts=Number(rows[idx].total_points||0); const extra=idx>0?` · a ${fmt(Number(rows[idx-1].total_points)-pts)} pts de la posició anterior`:(rows.length>1?` · ${fmt(pts-Number(rows[1].total_points))} pts d’avantatge`:''); me.innerHTML=`<span class="me-pos">${ord(idx+1)}</span><div><b>La teva posició</b><small>${idx+1} de ${rows.length} · ${fmt(pts)} pts${extra}</small></div>`; } }
-    box.innerHTML=rows.length?rows.map((x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`).join(''):'<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
+    const rowH=(x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`;
+    const podH=(x,i)=>{ const nm=x.team_name||'Equip Fantasy', ini=nm.replace(/[^\p{L}\p{N} ]/gu,'').trim().split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?', hue=[...nm].reduce((a,c)=>a+c.charCodeAt(0),0)%360; return `<div class="pd p${i+1}${isMine(x)?' mine':''}"><span class="pd-av" style="background:hsl(${hue} 45% 32%)">${escapeHtml(ini)}</span><b>${escapeHtml(nm)}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<strong>${fmt(x.total_points)}</strong><small>pts</small><div class="pd-bar">${['🥇','🥈','🥉'][i]}</div></div>`; };
+    if(!rows.length) box.innerHTML='<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
+    else if(rows.length>=3){ const top=rows.slice(0,3); box.innerHTML=`<div class="podium">${podH(top[1],1)}${podH(top[0],0)}${podH(top[2],2)}</div>`+rows.slice(3).map((x,k)=>rowH(x,k+3)).join(''); }
+    else box.innerHTML=rows.map(rowH).join('');
   }catch(e){box.innerHTML=`<div class="empty-state">No s'ha pogut carregar la classificació.<br><small>${escapeHtml(e.message)}</small></div>`;}
 }
 const HL_PTS=[7,5,3], HL_MEDAL=['🥇','🥈','🥉'];
@@ -1590,7 +1595,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=94; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=95; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2055,3 +2060,44 @@ function initCards(){
   loadCards();
 }
 /*CARDS-END*/
+
+/*POLISH-START*/
+/* Capa d'estètica: marcador, menú inferior "Més", mode fosc, animacions i avisos */
+function polishCount(el,to,fmt){
+  if(!el) return; const from=el.dataset.pv===undefined?to:Number(el.dataset.pv); el.dataset.pv=to; const f=fmt||(v=>String(v));
+  if(from===to||(typeof reduceMotion==='function'&&reduceMotion())){ el.textContent=f(to); return; }
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  const t0=performance.now(); (function step(t){ const k=Math.min(1,(t-t0)/800), e=1-Math.pow(1-k,3); el.textContent=f(from+(to-from)*e); if(k<1) requestAnimationFrame(step); })(t0);
+}
+function polishToast(msg){
+  document.querySelectorAll('.pl-toast').forEach(x=>x.remove());
+  const t=document.createElement('div'); t.className='pl-toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>{ t.style.transition='opacity .4s'; t.style.opacity='0'; setTimeout(()=>t.remove(),450); },3600);
+}
+function polishRankMove(pos){
+  if(!pos||!state.teamId) return; const k='fq_lastpos_'+state.teamId; let last=0; try{ last=Number(localStorage.getItem(k)||0); }catch{}
+  try{ localStorage.setItem(k,String(pos)); }catch{}
+  if(last&&pos<last){ try{ confetti(); }catch{} polishToast(`🎉 Has pujat al ${pos}${pos===1?'r':pos===2?'n':pos===3?'r':'è'} lloc!`); }
+}
+(function polishInit(){
+  const _ss=window.showSection;
+  if(typeof _ss==='function'){ window.showSection=function(id){ const r=_ss.apply(this,arguments); try{ document.body.dataset.sec=id; polishSync(); }catch{} return r; }; showSection=window.showSection; }
+  function polishSync(){ const sh=document.querySelector('.more-sheet'), mb=document.querySelector('.tabmore'); if(!sh||!mb) return; mb.classList.toggle('on',!!sh.querySelector('.tab.active')); sh.classList.remove('open'); }
+  function build(){
+    const nav=document.querySelector('nav.tabs'); if(!nav||nav.querySelector('.more-sheet')) return;
+    const sheet=document.createElement('div'); sheet.className='more-sheet';
+    ['clubs','results','rules','tableDuty','coachPanel'].forEach(id=>{ const b=nav.querySelector(`.tab[data-section="${id}"]`); if(b){ b.classList.add('tab-more'); sheet.appendChild(b); } });
+    const mb=document.createElement('button'); mb.type='button'; mb.className='tabmore'; mb.setAttribute('aria-label','Més seccions'); mb.innerHTML='⋯ <span>Més</span>';
+    mb.addEventListener('click',e=>{ e.stopPropagation(); sheet.classList.toggle('open'); });
+    nav.appendChild(sheet); nav.appendChild(mb);
+    sheet.style.display=''; document.addEventListener('click',e=>{ if(!e.target.closest('.more-sheet')&&!e.target.closest('.tabmore')) sheet.classList.remove('open'); });
+    sheet.addEventListener('click',()=>setTimeout(()=>sheet.classList.remove('open'),50));
+    document.body.dataset.sec=document.querySelector('.section.active')?.id||'home'; polishSync();
+  }
+  function theme(){
+    const b=document.getElementById('themeBtn'); if(!b) return; let d=false; try{ d=localStorage.getItem('fq_dark')==='1'; }catch{}
+    const apply=v=>{ document.body.classList.toggle('dark',v); b.textContent=v?'☀️':'🌙'; b.title=v?'Mode clar':'Mode fosc'; };
+    apply(d); b.addEventListener('click',()=>{ d=!d; apply(d); try{ localStorage.setItem('fq_dark',d?'1':'0'); }catch{} });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{ build(); theme(); }); else { build(); theme(); }
+})();
+/*POLISH-END*/
