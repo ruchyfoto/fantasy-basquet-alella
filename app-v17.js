@@ -1595,7 +1595,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=95; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=96; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2081,18 +2081,8 @@ function polishRankMove(pos){
 (function polishInit(){
   const _ss=window.showSection;
   if(typeof _ss==='function'){ window.showSection=function(id){ const r=_ss.apply(this,arguments); try{ document.body.dataset.sec=id; polishSync(); }catch{} return r; }; showSection=window.showSection; }
-  function polishSync(){ const sh=document.querySelector('.more-sheet'), mb=document.querySelector('.tabmore'); if(!sh||!mb) return; mb.classList.toggle('on',!!sh.querySelector('.tab.active')); sh.classList.remove('open'); }
-  function build(){
-    const nav=document.querySelector('nav.tabs'); if(!nav||nav.querySelector('.more-sheet')) return;
-    const sheet=document.createElement('div'); sheet.className='more-sheet';
-    ['clubs','results','rules','tableDuty','coachPanel'].forEach(id=>{ const b=nav.querySelector(`.tab[data-section="${id}"]`); if(b){ b.classList.add('tab-more'); sheet.appendChild(b); } });
-    const mb=document.createElement('button'); mb.type='button'; mb.className='tabmore'; mb.setAttribute('aria-label','Més seccions'); mb.innerHTML='⋯ <span>Més</span>';
-    mb.addEventListener('click',e=>{ e.stopPropagation(); sheet.classList.toggle('open'); });
-    nav.appendChild(sheet); nav.appendChild(mb);
-    sheet.style.display=''; document.addEventListener('click',e=>{ if(!e.target.closest('.more-sheet')&&!e.target.closest('.tabmore')) sheet.classList.remove('open'); });
-    sheet.addEventListener('click',()=>setTimeout(()=>sheet.classList.remove('open'),50));
-    document.body.dataset.sec=document.querySelector('.section.active')?.id||'home'; polishSync();
-  }
+  function polishSync(){ const t=document.querySelector('nav.tabs .tab.active'); if(t&&t.scrollIntoView){ try{ t.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'}); }catch{} } }
+  function build(){ document.body.dataset.sec=document.querySelector('.section.active')?.id||'home'; polishSync(); }
   function theme(){
     const b=document.getElementById('themeBtn'); if(!b) return; let d=false; try{ d=localStorage.getItem('fq_dark')==='1'; }catch{}
     const apply=v=>{ document.body.classList.toggle('dark',v); b.textContent=v?'☀️':'🌙'; b.title=v?'Mode clar':'Mode fosc'; };
