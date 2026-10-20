@@ -102,7 +102,7 @@ function hideAuth(){ $('authGate').style.display='none'; $('appShell').style.dis
 
 function playerCard(p,inTeam=false){
   const dorsal=p.shirt_number ?? '—';
-  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" onerror="fixImageError(this)">` : '<img src="logo.png" alt="" class="player-photo logo-ph">';
+  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" loading="lazy" decoding="async" onerror="fixImageError(this)">` : '<img src="logo.png" alt="" class="player-photo logo-ph">';
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
@@ -115,7 +115,7 @@ function coachCard(c,realTeamId,inTeam=false){
   if(!relation)return '';
   const coachPhoto=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
   const owned=state.rosterCoaches.some(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(realTeamId));
-  return `<article class="player-card" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" data-ph="🧑‍🏫" onerror="fixImageError(this)"><span class="pc-team">${escapeHtml(teamName(realTeamId))}</span></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" loading="lazy" decoding="async" data-ph="🧑‍🏫" onerror="fixImageError(this)"><span class="pc-team">${escapeHtml(teamName(realTeamId))}</span></div><div class="player-info"><div class="coach-label">ENTRENADOR</div><h3>${escapeHtml(coachName(c))}</h3><span class="player-team">🏀 ${escapeHtml(teamName(realTeamId))}</span></div><div class="player-meta"><div><small>Valor</small><b>${money(coachValue)}</b></div><div><small>Estat</small><b>${owned?'A la plantilla':'Mercat'}</b></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
 }
 
 function render(){
@@ -1595,7 +1595,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=96; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=97; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
