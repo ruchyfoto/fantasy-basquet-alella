@@ -195,7 +195,9 @@ function renderMarket(){
   if(state.marketType==='players'){
     $('search').placeholder='Cerca jugador…';
     const list=state.players.filter(p=>`${p.name} ${p.surname} ${teamName(p.real_team_id)}`.toLowerCase().includes(q)&&(!team||String(p.real_team_id)===String(team)));
-    $('marketGrid').innerHTML=list.map(p=>playerCard(p,false)).join('')||'<div class="empty-state"><div class="empty-icon">🔎</div><h3>No hem trobat cap jugador</h3></div>';
+    const key=state.marketType+'|'+q+'|'+team; if(state.mkKey!==key){ state.mkKey=key; state.mkLimit=24; }
+    const lim=state.mkLimit||24, more=list.length-lim;
+    $('marketGrid').innerHTML=list.slice(0,lim).map(p=>playerCard(p,false)).join('')+(more>0?`<button type="button" class="secondary" id="mkMore" style="grid-column:1/-1;padding:14px">Mostra’n més (${more} més)</button>`:'')||'<div class="empty-state"><div class="empty-icon">🔎</div><h3>No hem trobat cap jugador</h3></div>';
   }else{
     $('search').placeholder='Cerca entrenador…'; const list=[];
     state.coachTeams.forEach(r=>{const c=state.coaches.find(c=>String(c.id)===String(r.coach_id));if(c&&(!team||String(r.real_team_id)===String(team))&&`${coachName(c)} ${teamName(r.real_team_id)}`.toLowerCase().includes(q))list.push(coachCard(c,r.real_team_id,false));});
@@ -203,10 +205,11 @@ function renderMarket(){
   }
   bindActions();
 }
+document.addEventListener('click',e=>{ if(e.target.closest('#mkMore')){ state.mkLimit=(state.mkLimit||24)+24; renderMarket(); } });
 function renderClubs(){
   const ts=state.teamStats||{};
   const cph=c=>(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
-  const chip=(attrs,img,ph,name,sub)=>`<div class="chip" ${attrs}>${img?`<img src="${escapeHtml(img)}" alt="" data-ph="${ph}" onerror="fixImageError(this)">`:`<span class="chip-ph">${ph}</span>`}<div><b>${escapeHtml(name)}</b><small>${sub}</small></div></div>`;
+  const chip=(attrs,img,ph,name,sub)=>`<div class="chip" ${attrs}>${img?`<img src="${escapeHtml(img)}" alt="" loading="lazy" decoding="async" data-ph="${ph}" onerror="fixImageError(this)">`:`<span class="chip-ph">${ph}</span>`}<div><b>${escapeHtml(name)}</b><small>${sub}</small></div></div>`;
   $('clubsGrid').innerHTML=state.teams.map(t=>{
     const st=ts[t.id]||{}, pj=Number(st.played||0), g=Number(st.wins||0), pop=st.teams?Math.round(100*Number(st.owners||0)/Number(st.teams)):null;
     const coaches=state.coachTeams.filter(r=>String(r.real_team_id)===String(t.id)).map(r=>({c:state.coaches.find(c=>String(c.id)===String(r.coach_id)),tid:r.real_team_id})).filter(o=>o.c);
@@ -1595,7 +1598,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=97; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=98; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
