@@ -247,18 +247,18 @@ async function renderRanking(){
   const box=$('rankingList'); if(!box)return;
   try{
     const r=await rpc('get_fantasy_classification',{}); const txt=await r.text(); if(!r.ok)throw new Error(txt.replace(/^"|"$/g,''));
-    const rows=JSON.parse(txt||'[]');
+    const rows=JSON.parse(txt||'[]'); await loadAvatars();
     const isMine=x=>String(x.fantasy_team_id)===String(state.teamId), fmt=v=>Number(v||0).toFixed(1).replace('.',','), ord=n=>({1:'1r',2:'2n',3:'3r',4:'4t'}[n]||n+'è');
     const me=$('rankingMe'), idx=rows.findIndex(isMine);
     ['myPoints','myPoints2'].forEach(k=>{ const el=$(k); if(el) polishCount(el,idx>=0?Number(rows[idx].total_points||0):0,fmt); });
     { const hp=$('heroPos'); if(hp) hp.textContent=idx>=0?ord(idx+1):'—'; polishRankMove(idx>=0?idx+1:0); }
-    if(me){ if(idx<0) me.innerHTML=''; else { const pts=Number(rows[idx].total_points||0); const extra=idx>0?` · a ${fmt(Number(rows[idx-1].total_points)-pts)} pts de la posició anterior`:(rows.length>1?` · ${fmt(pts-Number(rows[1].total_points))} pts d’avantatge`:''); me.innerHTML=`<span class="me-pos">${ord(idx+1)}</span><div><b>La teva posició</b><small>${idx+1} de ${rows.length} · ${fmt(pts)} pts${extra}</small></div>`; } }
-    const rowH=(x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span><div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`;
+    if(me){ if(idx<0) me.innerHTML=''; else { const pts=Number(rows[idx].total_points||0); const extra=idx>0?` · a ${fmt(Number(rows[idx-1].total_points)-pts)} pts de la posició anterior`:(rows.length>1?` · ${fmt(pts-Number(rows[1].total_points))} pts d’avantatge`:''); me.innerHTML=`<span class="me-pos">${ord(idx+1)}</span><button type="button" class="av-btnwrap" data-avopen aria-label="Foto de perfil">${avHtml(rows[idx].fantasy_team_id,rows[idx].team_name,'av-md')}</button><div><b>La teva posició</b><small>${idx+1} de ${rows.length} · ${fmt(pts)} pts${extra}</small></div>`; } }
+    const rowH=(x,i)=>`<div class="ranking-row${i<3?' top'+(i+1):''}${isMine(x)?' mine':''}" style="--i:${i}"><span class="ranking-pos">${['🥇','🥈','🥉'][i]||i+1}</span>${avHtml(x.fantasy_team_id,x.team_name,'av-sm')}<div class="ranking-name"><b>${escapeHtml(x.team_name||'Equip Fantasy')}</b>${isMine(x)?'<span class="me-badge">TU</span>':''}<small>${money(x.budget)} disponibles</small></div><strong>${Number(x.total_points||0).toFixed(1).replace('.',',')} pts</strong></div>`;
     const podH=(x,i)=>{ const nm=x.team_name||'Equip Fantasy', H=[132,96,84][i], N=['1','2','3'][i];
       const icon=i===0?'<svg viewBox="0 0 64 70" aria-hidden="true"><defs><linearGradient id="pgG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#d49a12"/></linearGradient></defs><path d="M14 6h36v18c0 11-8 19-18 19S14 35 14 24z" fill="url(#pgG)" stroke="#a8730a" stroke-width="2"/><path d="M14 10H5c0 12 4 19 12 21M50 10h9c0 12-4 19-12 21" fill="none" stroke="#e0aa22" stroke-width="4" stroke-linecap="round"/><rect x="28" y="43" width="8" height="10" fill="#c98f10"/><path d="M18 62h28l-3-9H21z" fill="url(#pgG)" stroke="#a8730a" stroke-width="2"/><circle cx="32" cy="22" r="8" fill="#f6c844" stroke="#a8730a" stroke-width="1.5"/><text x="32" y="26" text-anchor="middle" font-size="11" font-weight="900" fill="#8a5c06">1</text></svg>'
         :`<svg viewBox="0 0 48 60" aria-hidden="true"><defs><linearGradient id="pgM${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${i===1?'#f4f6f7':'#e8b184'}"/><stop offset="1" stop-color="${i===1?'#9aa3a8':'#a8693a'}"/></linearGradient></defs><path d="M13 0h8l5 16-6 3z" fill="#d83a3a"/><path d="M27 0h8l-7 19-6-3z" fill="#2a56c6"/><path d="M21 0h6l-1 16-2 2-2-2z" fill="#fff"/><circle cx="24" cy="38" r="17" fill="url(#pgM${i})" stroke="${i===1?'#8d969b':'#8a5128'}" stroke-width="2"/><text x="24" y="45" text-anchor="middle" font-size="20" font-weight="900" fill="#fff" stroke="${i===1?'#8d969b':'#8a5128'}" stroke-width=".7">${N}</text></svg>`;
       const blk=`<svg class="pm-svg" viewBox="0 0 120 ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="M2 9L118 3l-2 13-110 4z" fill="#e8762c"/><path d="M8 20L5 ${H-5}M113 16l3 ${H-21}" stroke="#e8762c" stroke-width="4" stroke-linecap="round" fill="none" vector-effect="non-scaling-stroke"/><path d="M-2 ${H-3}L122 ${H-6}" stroke="#e8762c" stroke-width="4" stroke-linecap="round" fill="none" vector-effect="non-scaling-stroke"/></svg>`;
-      return `<div class="pm pm${i+1}${isMine(x)?' mine':''}"><div class="pm-up"><span class="pm-ic">${icon}</span><div class="pm-blk" style="height:${H}px">${blk}<b class="pm-n">${N}</b></div></div><div class="pm-dn"><span class="pm-name">${escapeHtml(nm)}</span>${isMine(x)?'<span class="pm-me">TU</span>':''}<span class="pm-pts">${fmt(x.total_points)} pts</span></div></div>`; };
+      return `<div class="pm pm${i+1}${isMine(x)?' mine':''}"><div class="pm-up"><span class="pm-ic">${icon}</span><div class="pm-blk" style="height:${H}px">${blk}<b class="pm-n">${N}</b></div></div><div class="pm-dn">${avHtml(x.fantasy_team_id,nm,'av-pod')}<span class="pm-name">${escapeHtml(nm)}</span>${isMine(x)?'<span class="pm-me">TU</span>':''}<span class="pm-pts">${fmt(x.total_points)} pts</span></div></div>`; };
     if(!rows.length) box.innerHTML='<div class="empty-state"><h3>Encara no hi ha equips classificats</h3></div>';
     else if(rows.length>=3){ const top=rows.slice(0,3); box.innerHTML=`<div class="pdm"><div class="pdm-title"><span>General de la lliga Fantasy</span></div><div class="pdm-stage">${podH(top[1],1)}${podH(top[0],0)}${podH(top[2],2)}</div></div>`+rows.slice(3).map((x,k)=>rowH(x,k+3)).join(''); }
     else box.innerHTML=rows.map(rowH).join('');
@@ -546,7 +546,7 @@ function renderManage(){
   <div class="mg-row" data-form="1"><input class="mg-n" placeholder="Nom"><input class="mg-s" placeholder="Cognoms"><input class="mg-v" placeholder="Preu M€" inputmode="decimal"><select class="mg-t">${teamOpts('')}</select><button class="primary" data-mg="addc">Afegir entrenador</button></div>
   ${cs.map(c=>`<div class="mg-row" data-id="${c.id}"><input class="mg-n" value="${escapeHtml(c.name||'')}"><input class="mg-s" value="${escapeHtml(c.surname||'')}"><input class="mg-v" value="${escapeHtml(coachPrice(c))}" inputmode="decimal">${photo('coaches')}<button class="secondary" data-mg="crop" title="Reenquadrar foto">✂️</button><button class="primary" data-mg="savec">Desar</button><button class="secondary danger" data-mg="delc">Retirar</button></div>${ctBlock(c)}`).join('')}
   <h4>👤 Usuaris, entrenadors i administradors</h4>
-  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button><span class="mg-adj"><input class="mg-ap" placeholder="± Punts" inputmode="decimal"><input class="mg-ab" placeholder="± M€" inputmode="decimal"><input class="mg-ar" placeholder="Motiu (opcional)"><button class="primary" data-mg="adj">➕ Ajustar</button></span></div>`).join('')||'<small>Sense usuaris.</small>'}
+  ${(state.adminUsers||[]).map(u=>`<div class="mg-row" data-uid="${u.user_id}" data-adm="${u.is_admin?1:0}" data-tbl="${u.is_table?1:0}"><span style="flex:1 1 200px">${escapeHtml(u.username||'')} · <small>${escapeHtml(u.email||'')}</small>${u.is_admin?' 🛡️':''}</span><select class="mg-c">${coachOpts(u.coach_id)}</select><button class="primary" data-mg="role">Desar rol</button><button class="secondary" data-mg="adm">${u.is_admin?'Treure admin':'Fer admin'}</button><button class="secondary" data-mg="noav">🚫 Treure foto</button><button class="secondary" data-mg="tbl">${u.is_table?'📋 Treure de taula':'📋 Fa taula'}</button><span class="mg-adj"><input class="mg-ap" placeholder="± Punts" inputmode="decimal"><input class="mg-ab" placeholder="± M€" inputmode="decimal"><input class="mg-ar" placeholder="Motiu (opcional)"><button class="primary" data-mg="adj">➕ Ajustar</button></span></div>`).join('')||'<small>Sense usuaris.</small>'}
   <h4>📜 Registre d’activitat (últims 30)</h4>
   ${(state.adminLog||[]).map(x=>{const d=x.detall||{};const what=[d.name,d.surname].filter(Boolean).join(' ')||d.user_id||d.id||'';return `<div class="mg-log"><small>${new Date(x.created_at).toLocaleString('ca-ES')} · <b>${escapeHtml(who(x.user_id))}</b> · ${escapeHtml(x.tabla)} ${escapeHtml(x.operacio)} · ${escapeHtml(String(what))}</small></div>`;}).join('')||'<small>Encara no hi ha activitat.</small>'}`;
 }
@@ -588,6 +588,7 @@ async function manageClick(e){
   else if(a==='addc'){ if(!v('.mg-n')) return alert('Cal escriure un nom.'); ok=await adminRpc('admin_save_coach',{p_id:null,p_data:{name:v('.mg-n'),surname:v('.mg-s'),current_value:num('.mg-v')},p_team_id:Number(v('.mg-t'))}); msg='Entrenador afegit.'; }
   else if(a==='delc'){ if(!confirm(`Retirar l’entrenador ${nom()}?\n\nSi algú el té fitxat, se li reemborsarà el seu valor de mercat.`)) return; ok=await adminRpc('admin_retire_coach',{p_id:Number(row.dataset.id)}); msg='Entrenador retirat.'; }
   else if(a==='role'){ ok=await adminRpc('admin_set_coach_assignment',{p_pin:'1234',p_user_id:row.dataset.uid,p_coach_id:v('.mg-c')?Number(v('.mg-c')):null}); msg='Rol d’entrenador actualitzat.'; }
+  else if(a==='noav'){ if(!confirm('Treure la foto de perfil d’aquest usuari?')) return; ok=await adminRpc('admin_remove_avatar',{p_user_id:row.dataset.uid}); msg='Foto treta.'; }
   else if(a==='tbl'){ ok=await adminRpc('admin_set_table_person',{p_user_id:row.dataset.uid,p_on:row.dataset.tbl!=='1'}); msg='Llista de taula actualitzada.'; }
   else if(a==='adj'){ const pts=num('.mg-ap'), bud=num('.mg-ab');
     if((pts===null||isNaN(pts))&&(bud===null||isNaN(bud))) return alert('Escriu els punts i/o el pressupost a afegir (amb signe menys per restar).');
@@ -1521,8 +1522,8 @@ async function openLeague(id,keep){
   document.querySelectorAll('.lg-detail').forEach(x=>{ if(x!==det) x.innerHTML=''; });
   det.innerHTML='<p class="st-empty">Carregant…</p>';
   try{
-    const d=await lgCall('get_league_ranking',{p_league:id}), lg=d.league, rows=d.rows||[], fmt=v=>Number(v||0).toFixed(1).replace('.',',');
-    det.innerHTML=`<div class="lg-code">Codi per convidar: <b>${escapeHtml(lg.code)}</b></div><div class="ranking-list">${rows.map(x=>`<div class="ranking-row${x.pos<=3?' top'+x.pos:''}${x.is_me?' mine':''}"><span class="ranking-pos">${['🥇','🥈','🥉'][x.pos-1]||x.pos}</span><div class="ranking-name"><b>${escapeHtml(x.team_name)}</b>${x.is_me?'<span class="me-badge">TU</span>':''}${x.is_owner?'<small>👑 creador/a</small>':''}</div><strong>${fmt(x.total_points)} pts</strong>${lg.is_owner&&!x.is_me?`<button type="button" class="lg-x" data-lgrm="${x.fantasy_team_id}" data-lgid="${id}" aria-label="Treure de la lliga">✕</button>`:''}</div>`).join('')}</div><div class="lg-actions"><button type="button" class="primary" data-lgshare="${id}">📤 Convidar</button><button type="button" class="secondary" data-lgcopy="${id}">Copiar codi</button><button type="button" class="secondary" data-lgleave="${id}">Sortir</button>${lg.is_owner?`<button type="button" class="secondary danger" data-lgdel="${id}">Esborrar lliga</button>`:''}</div>`;
+    const d=await lgCall('get_league_ranking',{p_league:id}); await loadAvatars(); const  lg=d.league, rows=d.rows||[], fmt=v=>Number(v||0).toFixed(1).replace('.',',');
+    det.innerHTML=`<div class="lg-code">Codi per convidar: <b>${escapeHtml(lg.code)}</b></div><div class="ranking-list">${rows.map(x=>`<div class="ranking-row${x.pos<=3?' top'+x.pos:''}${x.is_me?' mine':''}"><span class="ranking-pos">${['🥇','🥈','🥉'][x.pos-1]||x.pos}</span>${avHtml(x.fantasy_team_id,x.team_name,'av-sm')}<div class="ranking-name"><b>${escapeHtml(x.team_name)}</b>${x.is_me?'<span class="me-badge">TU</span>':''}${x.is_owner?'<small>👑 creador/a</small>':''}</div><strong>${fmt(x.total_points)} pts</strong>${lg.is_owner&&!x.is_me?`<button type="button" class="lg-x" data-lgrm="${x.fantasy_team_id}" data-lgid="${id}" aria-label="Treure de la lliga">✕</button>`:''}</div>`).join('')}</div><div class="lg-actions"><button type="button" class="primary" data-lgshare="${id}">📤 Convidar</button><button type="button" class="secondary" data-lgcopy="${id}">Copiar codi</button><button type="button" class="secondary" data-lgleave="${id}">Sortir</button>${lg.is_owner?`<button type="button" class="secondary danger" data-lgdel="${id}">Esborrar lliga</button>`:''}</div>`;
   }catch(e){ det.innerHTML=`<p class="st-empty">No s’ha pogut carregar.<br><small>${escapeHtml(e.message)}</small></p>`; }
 }
 document.addEventListener('click',async e=>{
@@ -1602,7 +1603,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=99; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=100; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2098,3 +2099,104 @@ function polishRankMove(pos){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',()=>{ build(); theme(); }); else { build(); theme(); }
 })();
 /*POLISH-END*/
+/*AV-START*/
+state.avatars=state.avatars||{};
+async function loadAvatars(){
+  try{ const r=await rpc('get_avatars',{}); if(r.ok){ const d=await r.json(); state.avatars=d&&typeof d==='object'?d:{}; } }catch{}
+  return state.avatars;
+}
+function avUrl(a){
+  if(!a) return '';
+  if(a.k==='player'){ const p=(state.players||[]).find(x=>String(x.id)===String(a.r)); return p&&p.photo_url||''; }
+  if(a.k==='coach'){ const c=(state.coaches||[]).find(x=>String(x.id)===String(a.r)); return c?cdCoachPhoto(c):''; }
+  if(a.k==='upload') return `${SUPABASE_URL}/storage/v1/object/public/avatars/${a.r}/avatar.jpg?v=${a.v||0}`;
+  return '';
+}
+function avHtml(teamId,name,cls){
+  const a=(state.avatars||{})[String(teamId)], u=avUrl(a), nm=String(name||'?').trim();
+  let h=0; for(const ch of nm) h=(h*31+ch.charCodeAt(0))%360;
+  const ini=escapeHtml((nm.match(/[A-Za-zÀ-ÿ0-9]/)||['?'])[0].toUpperCase());
+  return `<span class="av ${cls||''}" style="--h:${h}">${u?`<img src="${escapeHtml(u)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}<i>${ini}</i></span>`;
+}
+function avClose(){ const m=$('avModal'); if(m) m.remove(); document.body.style.overflow=''; }
+function avOpen(){
+  if(!state.session){ return; }
+  avClose();
+  const myId=String(state.teamId), cur=(state.avatars||{})[myId];
+  const m=document.createElement('div'); m.id='avModal'; m.className='av-modal';
+  m.innerHTML=`<div class="av-box" role="dialog" aria-modal="true"><button class="av-x" data-av="close" aria-label="Tancar">✕</button>
+  <h3>📷 La teva foto de perfil</h3>
+  <div class="av-cur">${avHtml(myId,state.team?.team_name||state.team?.name||state.username,'av-xl')}<small>Només és una imatge per a la classificació: no vol dir que siguis aquesta persona.</small></div>
+  <div id="avMsg" class="av-msg" role="status"></div>
+  <div class="av-sec"><b>1. Fes-te una foto o tria-la de la galeria</b>
+    <label class="primary av-file">📷 Escollir foto<input type="file" id="avFile" accept="image/*" hidden></label>
+    <div id="avCrop" style="display:none"><canvas id="avCv" width="240" height="240"></canvas><input type="range" id="avZoom" min="1" max="3" step="0.01" value="1" aria-label="Zoom"><small>Arrossega per centrar la cara i fes zoom.</small><button class="primary" data-av="save">Desar aquesta foto</button></div></div>
+  <div class="av-sec"><b>2. O tria una foto del club</b>
+    <div class="av-tabs"><button class="secondary on" data-av="tab" data-k="player">Jugadors</button><button class="secondary" data-av="tab" data-k="coach">Entrenadors</button></div>
+    <input id="avQ" placeholder="Cerca pel nom…" autocomplete="off"><div id="avGrid" class="av-grid"></div></div>
+  ${cur?'<button class="secondary av-rm" data-av="none">🗑️ Treure la meva foto</button>':''}
+  <p class="av-note">Si hi surt algú menor d’edat, cal el permís d’un adult. L’organització pot treure fotos inadequades.</p></div>`;
+  document.body.appendChild(m); document.body.style.overflow='hidden';
+  m._k='player'; avGrid();
+  m.addEventListener('click',avClick);
+  $('avQ').oninput=avGrid;
+  $('avFile').onchange=e=>avPick(e.target.files&&e.target.files[0]);
+}
+function avGrid(){
+  const m=$('avModal'); if(!m) return; const q=($('avQ').value||'').toLowerCase().trim(), k=m._k;
+  const src=k==='player'?(state.players||[]).filter(p=>p.is_active!==false&&p.photo_url&&!/logo|placeholder/i.test(String(p.photo_url))):(state.coaches||[]).filter(c=>c.is_active!==false);
+  const list=src.map(e=>({id:e.id,name:whoName(e),photo:k==='player'?e.photo_url:cdCoachPhoto(e)})).filter(x=>x.name&&(!q||x.name.toLowerCase().includes(q))).slice(0,60);
+  $('avGrid').innerHTML=list.map(x=>`<button class="av-pick" data-av="club" data-k="${k}" data-id="${x.id}" title="${escapeHtml(x.name)}"><img src="${escapeHtml(x.photo)}" alt="" loading="lazy" decoding="async" onerror="this.style.visibility='hidden'"><small>${escapeHtml(x.name)}</small></button>`).join('')||'<small>Cap resultat.</small>';
+}
+const AVS={img:null,z:1,ox:0,oy:0};
+async function avPick(f){
+  if(!f) return;
+  try{ AVS.img=await createImageBitmap(f); }catch{ avMsg('No s’ha pogut llegir la foto. Prova’n una altra.',1); return; }
+  AVS.z=1; AVS.ox=0; AVS.oy=0; $('avZoom').value=1; $('avCrop').style.display=''; avDraw();
+  const cv=$('avCv'); let d=null;
+  cv.onpointerdown=e=>{ d={x:e.clientX,y:e.clientY,ox:AVS.ox,oy:AVS.oy}; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove=e=>{ if(!d) return; const s=240/cv.getBoundingClientRect().width; AVS.ox=d.ox+(e.clientX-d.x)*s; AVS.oy=d.oy+(e.clientY-d.y)*s; avDraw(); };
+  cv.onpointerup=cv.onpointercancel=()=>{ d=null; };
+  $('avZoom').oninput=e=>{ AVS.z=Number(e.target.value); avDraw(); };
+}
+function avDraw(){
+  const cv=$('avCv'), c=cv.getContext('2d'), im=AVS.img; if(!im) return;
+  const base=240/Math.min(im.width,im.height), s=base*AVS.z, w=im.width*s, h=im.height*s;
+  AVS.ox=Math.max(-(w-240)/2,Math.min((w-240)/2,AVS.ox)); AVS.oy=Math.max(-(h-240)/2,Math.min((h-240)/2,AVS.oy));
+  c.fillStyle='#fff'; c.fillRect(0,0,240,240); c.drawImage(im,(240-w)/2+AVS.ox,(240-h)/2+AVS.oy,w,h);
+}
+function avMsg(t,bad){ const e=$('avMsg'); if(e){ e.textContent=t; e.className='av-msg'+(bad?' bad':''); } }
+async function avSet(kind,ref){
+  const r=await rpc('set_my_avatar',{p_kind:kind,p_ref:ref===undefined?null:ref}); const t=await r.text();
+  if(!r.ok){ let mm=t; try{ mm=JSON.parse(t).message||t; }catch{} throw new Error(mm); }
+}
+async function avSave(){
+  const btn=document.querySelector('[data-av="save"]'); if(btn) btn.disabled=true; avMsg('Pujant…');
+  try{
+    const out=document.createElement('canvas'); out.width=out.height=256; out.getContext('2d').drawImage($('avCv'),0,0,256,256);
+    const blob=await new Promise(res=>out.toBlob(res,'image/jpeg',0.85));
+    const uid=state.session?.user?.id; if(!uid) throw new Error('Cal iniciar sessió.');
+    const r=await fetch(`${SUPABASE_URL}/storage/v1/object/avatars/${uid}/avatar.jpg`,{method:'POST',headers:{...headers(),'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+    if(!r.ok) throw new Error('No s’ha pogut pujar la foto ('+r.status+').');
+    await avSet('upload'); await avDone('✅ Foto desada!');
+  }catch(e){ avMsg('⚠️ '+(e.message||e),1); if(btn) btn.disabled=false; }
+}
+async function avDone(msg){
+  await loadAvatars(); avClose(); if(typeof polishToast==='function') polishToast(msg); renderRanking(); avSyncBtn();
+}
+async function avClick(e){
+  const t=e.target.closest('[data-av]'); if(!t) { if(e.target.id==='avModal') avClose(); return; }
+  const a=t.dataset.av, m=$('avModal');
+  try{
+    if(a==='close') avClose();
+    else if(a==='tab'){ m._k=t.dataset.k; m.querySelectorAll('[data-av="tab"]').forEach(b=>b.classList.toggle('on',b===t)); avGrid(); }
+    else if(a==='save') avSave();
+    else if(a==='club'){ avMsg('Desant…'); await avSet(t.dataset.k,Number(t.dataset.id)); await avDone('✅ Foto triada!'); }
+    else if(a==='none'){ if(confirm('Vols treure la teva foto de perfil?')){ await avSet('none'); await avDone('Foto treta.'); } }
+  }catch(err){ avMsg('⚠️ '+(err.message||err)+' (si és el primer cop, l’administrador ha d’executar el pas 46).',1); }
+}
+function avSyncBtn(){ const b=$('avBtn'); if(b) b.innerHTML=((state.avatars||{})[String(state.teamId)]?'📷 Canviar foto de perfil':'📷 Foto de perfil'); }
+document.addEventListener('click',e=>{ if(e.target.closest('#avBtn,[data-avopen]')) avOpen(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') avClose(); });
+/*AV-END*/
+
