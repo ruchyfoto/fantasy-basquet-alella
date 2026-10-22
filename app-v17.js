@@ -1603,7 +1603,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=100; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=101; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2199,4 +2199,34 @@ function avSyncBtn(){ const b=$('avBtn'); if(b) b.innerHTML=((state.avatars||{})
 document.addEventListener('click',e=>{ if(e.target.closest('#avBtn,[data-avopen]')) avOpen(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') avClose(); });
 /*AV-END*/
+/*NEWS-START*/
+const NEWS_ID='news-avatars-v100';
+function newsSeen(){ try{ return localStorage.getItem(NEWS_ID)==='1'; }catch{ return false; } }
+function newsMark(){ try{ localStorage.setItem(NEWS_ID,'1'); }catch{} }
+function newsClose(){ const m=$('newsModal'); if(m) m.remove(); newsMark(); }
+function newsShow(){
+  if($('newsModal')||$('avModal')) return;
+  const m=document.createElement('div'); m.id='newsModal'; m.className='av-modal';
+  m.innerHTML=`<div class="av-box news-box" role="dialog" aria-modal="true"><button class="av-x" data-news="close" aria-label="Tancar">✕</button>
+  <div class="news-tag">🆕 NOVETAT</div><h3>Ja pots tenir la teva foto de perfil!</h3>
+  <div class="news-av">${avHtml(state.teamId,state.team?.team_name||state.team?.name||state.username,'av-xl')}</div>
+  <p>Fes-te una foto, tria-la de la galeria o escull la d’un jugador o entrenador del club. Apareixerà al <b>podi</b> i a la <b>classificació</b>.</p>
+  <button class="primary" data-news="go" style="width:100%">📷 Posar la meva foto</button>
+  <button class="secondary" data-news="close" style="width:100%;margin-top:8px">Més tard</button></div>`;
+  m.addEventListener('click',e=>{ const t=e.target.closest('[data-news]'); if(!t){ if(e.target===m) newsClose(); return; } const a=t.dataset.news; newsClose(); if(a==='go') avOpen(); });
+  document.body.appendChild(m);
+}
+(function(){
+  if(newsSeen()) return; let n=0;
+  const iv=setInterval(async()=>{
+    if(++n>90||newsSeen()){ clearInterval(iv); return; }
+    if(!state.session||!state.teamId||!(state.players||[]).length) return;
+    clearInterval(iv);
+    await loadAvatars();
+    if((state.avatars||{})[String(state.teamId)]){ newsMark(); return; }
+    newsShow();
+  },1000);
+})();
+/*NEWS-END*/
+
 
