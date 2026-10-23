@@ -1603,7 +1603,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=101; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=102; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -1998,6 +1998,7 @@ function cdHtml(k,id,rarity,opts){
 async function loadCards(){
   const card=$('cdCard'); if(!card) return;
   try{ CD.data=await lgCall('get_my_cards'); }catch(e){ card.style.display='none'; return; }
+  try{ CD.sales=await lgCall('get_card_sales_today'); }catch{ CD.sales=null; }
   card.style.display=''; renderCardsCard();
 }
 function cdOwnedMap(){ const m={}; ((CD.data&&CD.data.cards)||[]).forEach(c=>{ m[c.kind+':'+c.id]=c; }); return m; }
@@ -2023,7 +2024,10 @@ function cdBook(){
   list.forEach(p=>{ p.players.sort((a,b)=>a.info.name.localeCompare(b.info.name)); p.coaches.sort((a,b)=>a.info.name.localeCompare(b.info.name)); const all=p.coaches.concat(p.players); p.have=all.filter(r=>r.own).length; p.total=all.length; });
   return {pages:list,have:Object.keys(own).length,total:items.length};
 }
-function cdCell(r){ return r.own?cdHtml(r.k,r.id,r.own.rarity,{qty:r.own.qty}):`<div class="cd miss"><div class="cd-ph">?</div><div class="cd-n">???</div><div class="cd-t">${escapeHtml(r.info.team)}</div></div>`; }
+const CD_PRICE={normal:0.05,silver:0.10,gold:0.20}, CD_CAP=1.0;
+function cdEur(v){ return Number(v).toFixed(2).replace('.',',')+' M€'; }
+function cdDupes(){ let n=0,v=0; ((CD.data&&CD.data.cards)||[]).forEach(c=>{ const q=Number(c.qty||1)-1; if(q>0){ n+=q; v+=q*(CD_PRICE[c.rarity]||0.05); } }); return {n,v}; }
+function cdCell(r){ const sell=r.own&&r.own.qty>1?`<button type="button" class="cd-sell" data-cdsell="${r.k}:${r.id}">💰 +${cdEur(CD_PRICE[r.own.rarity]||0.05).replace(' M€','')}</button>`:''; return r.own?`<div class="cd-cell">${cdHtml(r.k,r.id,r.own.rarity,{qty:r.own.qty})}${sell}</div>`:`<div class="cd miss"><div class="cd-ph">?</div><div class="cd-n">???</div><div class="cd-t">${escapeHtml(r.info.team)}</div></div>`; }
 function cdOpenAlbum(dir){
   if(!CD.data) return; if(typeof dir!=='string') dir='';
   const b=cdBook(), n=b.pages.length, own=cdOwnedMap(); CD.page=Math.max(0,Math.min(CD.page||0,n)); const pi=CD.page;
@@ -2035,9 +2039,13 @@ function cdOpenAlbum(dir){
     const p=b.pages[pi-1]; sub=`Pàgina ${pi} de ${n}`;
     body=`<h3 class="bk-h">${escapeHtml(p.name)}</h3><div class="bk-hs">${p.have} de ${p.total} cromos d’aquest equip · toca un cromo per veure’n les estadístiques</div>`+(p.coaches.length?`<div class="cd-sec">Entrenadors</div><div class="cd-grid">${p.coaches.map(cdCell).join('')}</div>`:'')+(p.players.length?`<div class="cd-sec">Jugadors</div><div class="cd-grid">${p.players.map(cdCell).join('')}</div>`:'')+`<div class="bk-pn">— ${pi} —</div>`;
   }
-  const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>Àlbum de cromos</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div><div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
+  const dp=cdDupes(), soldT=Number(CD.sales&&CD.sales.sold_today||0), left=Math.max(0,CD_CAP-soldT);
+  const sellBar=dp.n>0?`<div class="cd-sellbar"><span>🔁 ${dp.n} repetit${dp.n>1?'s':''} · es poden vendre avui fins a ${cdEur(Math.min(dp.v,left))}</span><button type="button" class="primary" data-cdsellall ${left<0.05?'disabled':''}>💰 Vendre repetits</button></div>`:`<div class="cd-sellbar off"><span>Els repetits es poden vendre per diners (preu: normal 0,05 · plata 0,10 · or 0,20 M€; màx. 1 M€ al dia).</span></div>`;
+  const m=cdModal('cdAlbum',`<div class="mg-box cd-box cd-book"><div class="cd-bk-top"><div><b>Àlbum de cromos</b><small>${escapeHtml(sub)}</small></div><button type="button" class="cd-x" data-cdx aria-label="Tanca l’àlbum">✕</button></div>${sellBar}<div class="cd-page ${dir?'flip-'+dir:''}" id="cdPage">${body}</div><div class="cd-bar"><button type="button" data-cdnav="-1" aria-label="Pàgina anterior" ${pi===0?'disabled':''}>‹</button><button type="button" class="primary cd-close" data-cdx>✕ Tancar</button><button type="button" data-cdnav="1" aria-label="Pàgina següent" ${pi===n?'disabled':''}>›</button></div></div>`);
   const go=d=>{ const np=CD.page+d; if(np<0||np>n) return; CD.page=np; cdOpenAlbum(d>0?'next':'prev'); };
   m.onclick=e=>{ if(e.target===m||e.target.closest('[data-cdx]')) return cdCloseModal(m);
+    const sl=e.target.closest('[data-cdsell]'); if(sl){ const [k,id]=sl.dataset.cdsell.split(':'); return cdSell(k,Number(id)); }
+    if(e.target.closest('[data-cdsellall]')) return cdSell(null,null);
     const nv=e.target.closest('[data-cdnav]'); if(nv) return go(Number(nv.dataset.cdnav));
     const g=e.target.closest('[data-cdgo]'); if(g){ CD.page=Number(g.dataset.cdgo); return cdOpenAlbum('next'); }
     const c=e.target.closest('.cd:not(.miss)'); if(c){ const id=Number(c.dataset.cdid), pgx=pi>0?b.pages[pi-1]:null; if(c.dataset.ck==='c') openStats(id,'coach',pgx&&pgx.id!=='0'?pgx.id:null); else openStats(id); } };
@@ -2045,6 +2053,14 @@ function cdOpenAlbum(dir){
   CD.go=go;
 }
 document.addEventListener('keydown',e=>{ const m=$('cdAlbum'); if(m&&m.style.display==='flex'&&CD.go){ if(e.key==='ArrowRight') CD.go(1); else if(e.key==='ArrowLeft') CD.go(-1); } });
+async function cdSell(k,id){
+  if(!k){ const dp=cdDupes(), left=Math.max(0,CD_CAP-Number(CD.sales&&CD.sales.sold_today||0)); if(!confirm(`Vendre els teus repetits? Te’n quedes sempre una còpia de cada.\nGuanyaràs fins a ${cdEur(Math.min(dp.v,left))} (límit d’1 M€ al dia).`)) return; }
+  try{
+    const d=await lgCall('sell_cards',k?{p_kind:k,p_ref:id}:{});
+    if(state.team) state.team.budget=Number(d.budget); try{ animateMoney($('budget'),Number(d.budget)); }catch{}
+    await loadCards(); cdOpenAlbum(); if(typeof polishToast==='function') polishToast(`💰 Has venut ${d.sold} cromo${d.sold>1?'s':''} per ${cdEur(d.amount)}`);
+  }catch(e){ alert('⚠️ '+(e.message||e)+(/function|schema/i.test(String(e.message))?' (l’administrador ha d’executar el pas 47).':'')); }
+}
 function cdBig(k,id,o){
   const m=cdModal('cdBig',`<div class="cd-bigwrap" data-cdx>${cdHtml(k,id,o.rarity,{qty:o.qty})}<p>${o.qty>1?`Tens ${o.qty} còpies d’aquest cromo.`:'Tens una còpia.'} Toca per tancar.</p></div>`);
   m.onclick=()=>cdCloseModal(m);
