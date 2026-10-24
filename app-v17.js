@@ -892,7 +892,7 @@ function attModal(){
 }
 function closeAtt(){ const m=$('attModal'); if(m){ if(m._stop) m._stop(); m._stop=null; m.classList.remove('open'); } document.body.style.overflow=''; }
 async function redeemToken(token,teamId){
-  const r=await rpc('redeem_attendance',{p_token:token,p_team_id:Number(teamId)}), t=await r.text();
+  const r=await rpc('redeem_attendance',{p_token:token,p_team_id:Number(teamId)<0?0:Number(teamId)}), t=await r.text();
   if(!r.ok){ let msg=t; try{msg=JSON.parse(t).message||t;}catch{} return {ok:false,msg}; }
   try{ return {ok:true,...JSON.parse(t)}; }catch{ return {ok:true}; }
 }
@@ -907,9 +907,9 @@ function pickAttTeam(){
   return new Promise(resolve=>{
     const m=attModal(); let last=''; try{ last=localStorage.getItem('attTeam')||''; }catch{}
     const opts=(state.teams||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ca')).map(t=>`<option value="${escapeHtml(t.id)}"${String(t.id)===last?' selected':''}>${escapeHtml(t.name)}</option>`).join('');
-    m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">🏀</div><h3>De quin equip ets?</h3><p class="st-empty">Els punts d’assistència també compten per a la classificació d’afició dels equips del club.</p><select id="attTeamSel" style="width:100%;padding:12px;font-size:1rem;margin:10px 0"><option value="">— Tria el teu equip —</option>${opts}</select><div class="tour-nav"><button class="secondary" data-close="1">Cancel·lar</button><button class="primary" id="attTeamOk">Continuar</button></div></div>`;
+    m.innerHTML=`<div class="st-card tour"><button class="st-close" aria-label="Tancar">✕</button><div class="tour-hero">🏀</div><h3>De quin equip ets?</h3><p class="st-empty">Els punts d’assistència també compten per a la classificació d’afició dels equips del club. Si no ets de cap equip, tria <b>Extern</b>: sumes els teus punts igual, però no compta per a cap equip.</p><select id="attTeamSel" style="width:100%;padding:12px;font-size:1rem;margin:10px 0"><option value="">— Tria el teu equip —</option>${opts}<option value="ext"${last==='ext'?' selected':''}>🌍 Extern (no sóc de cap equip del club)</option></select><div class="tour-nav"><button class="secondary" data-close="1">Cancel·lar</button><button class="primary" id="attTeamOk">Continuar</button></div></div>`;
     m._stop=()=>resolve(null);
-    $('attTeamOk').onclick=()=>{ const v=$('attTeamSel').value; if(!v){ alert('Cal triar un equip.'); return; } try{ localStorage.setItem('attTeam',v); }catch{} m._stop=null; resolve(Number(v)); };
+    $('attTeamOk').onclick=()=>{ const v=$('attTeamSel').value; if(!v){ alert('Cal triar un equip o “Extern”.'); return; } try{ localStorage.setItem('attTeam',v); }catch{} m._stop=null; resolve(v==='ext'?-1:Number(v)); };
   });
 }
 function redeemPending(){ const t=sessionStorage.getItem('pendingAtt'); if(!t) return; sessionStorage.removeItem('pendingAtt'); pickAttTeam().then(tid=>{ if(!tid) return closeAtt(); return redeemToken(t,tid).then(showAttResult); }); }
@@ -1603,7 +1603,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=103; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=104; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
