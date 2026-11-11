@@ -1607,7 +1607,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=106; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=107; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2259,46 +2259,102 @@ async function fxSegmenter(){
   if(!FXS.seg){ const sg=new SelfieSegmentation({locateFile:f=>FX_CDN+f}); sg.setOptions({modelSelection:0}); sg.onResults(r=>{ if(FXS.resolve) FXS.resolve(r); }); await sg.initialize(); FXS.seg=sg; }
   return FXS.seg;
 }
-async function fxCut(url){
+const IMGLY_URL='https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
+async function fxLoadImgly(){ if(FXS.imgly) return FXS.imgly; const m=await import(IMGLY_URL); FXS.imgly=m; return m; }
+function fxCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+async function fxLoadBitmap(url,maxSide){
   const resp=await fetch(url,{mode:'cors'}); if(!resp.ok) throw new Error('No es pot llegir la foto ('+resp.status+')');
   const bmp=await createImageBitmap(await resp.blob());
-  const k=Math.min(1,720/Math.max(bmp.width,bmp.height)), w=Math.round(bmp.width*k), h=Math.round(bmp.height*k);
-  const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(bmp,0,0,w,h);
+  const k=Math.min(1,maxSide/Math.max(bmp.width,bmp.height)), w=Math.round(bmp.width*k), h=Math.round(bmp.height*k);
+  const c=fxCanvas(w,h); c.getContext('2d',{willReadFrequently:true}).drawImage(bmp,0,0,w,h); if(bmp.close) bmp.close();
+  return c;
+}
+/* Neteja la màscara: es queda amb la persona (peça més gran), esborra taques soltes i omple forats petits */
+function fxClean(d,w,h){
+  const n=w*h, lab=new Int32Array(n), sizes=[0]; let L=0; const st=new Int32Array(n);
+  const flood=(start,test,id)=>{ let sp=0, c=0; st[sp++]=start; lab[start]=id;
+    while(sp){ const i=st[--sp]; c++; const x=i%w, y=(i/w)|0;
+      if(x>0&&!lab[i-1]&&test(i-1)){ lab[i-1]=id; st[sp++]=i-1; } if(x<w-1&&!lab[i+1]&&test(i+1)){ lab[i+1]=id; st[sp++]=i+1; }
+      if(y>0&&!lab[i-w]&&test(i-w)){ lab[i-w]=id; st[sp++]=i-w; } if(y<h-1&&!lab[i+w]&&test(i+w)){ lab[i+w]=id; st[sp++]=i+w; } }
+    return c; };
+  const fg=i=>d[i*4+3]>127;
+  let big=0;
+  for(let i=0;i<n;i++) if(!lab[i]&&fg(i)){ L++; const c=flood(i,fg,L); sizes[L]=c; if(c>big) big=c; }
+  const keep=new Uint8Array(L+1); for(let k=1;k<=L;k++) keep[k]=sizes[k]>=big*0.12?1:0;
+  for(let i=0;i<n;i++) if(lab[i]>0&&!keep[lab[i]]) d[i*4+3]=0;
+  // forats interiors petits -> opacs
+  const lab2=new Int32Array(n); let B=0; const bsz=[0], touches=[0];
+  const bg=i=>d[i*4+3]<=127;
+  for(let i=0;i<n;i++){ if(lab2[i]||!bg(i)) continue; B++; let sp=0,c=0,tb=0; st[sp++]=i; lab2[i]=B;
+    while(sp){ const j=st[--sp]; c++; const x=j%w, y=(j/w)|0; if(x===0||y===0||x===w-1||y===h-1) tb=1;
+      if(x>0&&!lab2[j-1]&&bg(j-1)){ lab2[j-1]=B; st[sp++]=j-1; } if(x<w-1&&!lab2[j+1]&&bg(j+1)){ lab2[j+1]=B; st[sp++]=j+1; }
+      if(y>0&&!lab2[j-w]&&bg(j-w)){ lab2[j-w]=B; st[sp++]=j-w; } if(y<h-1&&!lab2[j+w]&&bg(j+w)){ lab2[j+w]=B; st[sp++]=j+w; } }
+    bsz[B]=c; touches[B]=tb; }
+  for(let i=0;i<n;i++){ const k=lab2[i]; if(k&&!touches[k]&&bsz[k]<n*0.015) d[i*4+3]=255; }
+}
+function fxCountFg(d){ let f=0; for(let i=3;i<d.length;i+=4) if(d[i]>127) f++; return f; }
+async function fxCutFast(url){
+  const c=await fxLoadBitmap(url,720), w=c.width, h=c.height, x=c.getContext('2d',{willReadFrequently:true});
   const seg=await fxSegmenter();
   const res=await new Promise((ok,ko)=>{ FXS.resolve=ok; const to=setTimeout(()=>ko(new Error('El model no ha respost.')),20000); seg.send({image:c}).catch(ko).then(()=>clearTimeout(to)); });
-  const m=document.createElement('canvas'); m.width=w; m.height=h; const mx=m.getContext('2d',{willReadFrequently:true}); mx.drawImage(res.segmentationMask,0,0,w,h);
+  const m=fxCanvas(w,h), mx=m.getContext('2d',{willReadFrequently:true}); mx.drawImage(res.segmentationMask,0,0,w,h);
   const md=mx.getImageData(0,0,w,h).data, im=x.getImageData(0,0,w,h), d=im.data;
   let opaque=true; for(let i=3;i<md.length;i+=4){ if(md[i]!==255){ opaque=false; break; } }
-  let fg=0;
-  for(let i=0;i<d.length;i+=4){
-    const v=(opaque?md[i]:md[i+3])/255, t=Math.min(1,Math.max(0,(v-0.42)/0.30)), a=t*t*(3-2*t);
-    d[i+3]=Math.round(a*255); if(a>.5) fg++;
-  }
-  if(fg<w*h*0.04) throw new Error('No s’ha detectat cap persona a la foto.');
+  for(let i=0;i<d.length;i+=4){ const v=(opaque?md[i]:md[i+3])/255, t=Math.min(1,Math.max(0,(v-0.45)/0.25)); d[i+3]=Math.round(t*t*(3-2*t)*255); }
+  fxClean(d,w,h);
+  if(fxCountFg(d)<w*h*0.04) throw new Error('No s’ha detectat cap persona a la foto.');
   x.putImageData(im,0,0);
   return await new Promise(ok=>c.toBlob(ok,'image/png'));
 }
-async function fxRun(limit){
+async function fxCutPrecise(url){
+  const c=await fxLoadBitmap(url,900);
+  const inBlob=await new Promise(ok=>c.toBlob(ok,'image/png'));
+  const m=await fxLoadImgly(); const rb=m.removeBackground||(m.default&&m.default.removeBackground)||m.default;
+  const out=await rb(inBlob,{model:'isnet_fp16',output:{format:'image/png'}});
+  const bmp=await createImageBitmap(out), r=fxCanvas(c.width,c.height), x=r.getContext('2d',{willReadFrequently:true}); x.drawImage(bmp,0,0,c.width,c.height); if(bmp.close) bmp.close();
+  const im=x.getImageData(0,0,r.width,r.height);
+  fxClean(im.data,r.width,r.height);
+  if(fxCountFg(im.data)<r.width*r.height*0.04) throw new Error('No s’ha detectat cap persona a la foto.');
+  x.putImageData(im,0,0);
+  return await new Promise(ok=>r.toBlob(ok,'image/png'));
+}
+async function fxCut(url,engine){
+  if(engine==='precise'&&!FXS.noPrecise){
+    try{ return await fxCutPrecise(url); }
+    catch(e){
+      if(/detectat|llegir/.test(String(e.message))) throw e;
+      if(!FXS.imgly){ FXS.noPrecise=true; FXS.fellBack=(e&&e.message)||'no s’ha pogut carregar'; }
+      else FXS.fellBack='error en una foto';
+    }
+  }
+  return await fxCutFast(url);
+}
+async function fxRun(limit,all){
   if(FXS.busy) return; if(!state.session) return alert('Cal iniciar sessió.');
-  const list=fxPending().slice(0,limit||1e9); if(!list.length){ fxMsg('No hi ha fotos pendents.'); return; }
-  FXS.busy=true; FXS.stop=false; let ok=0, bad=0; const prev=$('fxPrev'); if(prev) prev.innerHTML='';
+  const list=(all?fxItems():fxPending()).slice(0,limit||1e9); if(!list.length){ fxMsg('No hi ha fotos pendents.'); return; }
+  const engine=($('fxEngine')&&$('fxEngine').value)||'precise';
+  FXS.busy=true; FXS.stop=false; FXS.noPrecise=false; FXS.fellBack=''; let ok=0, bad=0, wl=null; const t0=Date.now(); const prev=$('fxPrev'); if(prev) prev.innerHTML='';
+  try{ if(navigator.wakeLock) wl=await navigator.wakeLock.request('screen'); }catch{}
   try{
     for(let i=0;i<list.length;i++){
-      if(FXS.stop) break; const it=list[i]; fxMsg(`Processant ${i+1}/${list.length}: ${it.name||it.id}…`);
+      if(FXS.stop) break; const it=list[i];
+      const eta=i>0?Math.round((Date.now()-t0)/i*(list.length-i)/1000):0;
+      fxMsg(`Processant ${i+1}/${list.length}: ${it.name||it.id}…${eta?` (queden uns ${eta>90?Math.round(eta/60)+' min':eta+' s'})`:(engine==='precise'&&!FXS.imgly?' la primera vegada descarrega el model (uns 80 MB) i pot trigar':'')}`);
       try{
-        const blob=await fxCut(it.src);
+        const blob=await fxCut(it.src,engine);
         const path=`cutout/${it.kind}-${it.id}-${Date.now()}.png`;
-        const up=await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`,{method:'POST',headers:{...headers(),'Content-Type':'image/png'},body:blob});
+        let up=null; for(let t=0;t<2;t++){ up=await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`,{method:'POST',headers:{...headers(),'Content-Type':'image/png'},body:blob}); if(up.ok) break; await new Promise(r=>setTimeout(r,800)); }
         if(!up.ok) throw new Error('No s’ha pogut pujar ('+up.status+')');
         const url=`${SUPABASE_URL}/storage/v1/object/public/fotos/${path}`;
         const r=await rpc('admin_save_cutout',{p_kind:it.kind,p_ref:Number(it.id),p_url:url,p_src:it.src}); if(!r.ok) throw new Error((await r.text()).slice(0,120));
         state.fx.cut[it.k+':'+it.id]={u:url,s:it.src}; ok++;
-        if(prev) prev.insertAdjacentHTML('beforeend',`<span class="fx-th" title="${escapeHtml(it.name)}"><img src="${URL.createObjectURL(blob)}" alt=""></span>`);
+        if(prev){ const th=await createImageBitmap(blob), tc=fxCanvas(56,70), tx=tc.getContext('2d'); const k=Math.max(56/th.width,70/th.height); tx.drawImage(th,(56-th.width*k)/2,0,th.width*k,th.height*k); if(th.close) th.close(); prev.insertAdjacentHTML('beforeend',`<span class="fx-th" title="${escapeHtml(it.name)}"><img src="${tc.toDataURL()}" alt=""></span>`); }
       }catch(e){ bad++; if(prev) prev.insertAdjacentHTML('beforeend',`<span class="fx-th bad" title="${escapeHtml((it.name||'')+': '+(e.message||e))}">⚠️</span>`); }
       fxAdminUi();
     }
-    fxMsg(`Fet: ${ok} retallades${bad?`, ${bad} amb error (passa el ratolí per veure el motiu)`:''}.${FXS.stop?' (aturat)':''} ${state.fx.enabled?'':'Encara està desactivat: prova-ho i activa’l quan t’agradi.'}`);
+    fxMsg(`Fet: ${ok} retallades${bad?`, ${bad} amb error (passa el ratolí per sobre del ⚠️; les fallades queden pendents i es poden reintentar)`:''}.${FXS.stop?' (aturat)':''}${FXS.fellBack?` ⚠️ El mode precís no ha funcionat (${FXS.fellBack}) i s’ha fet servir el ràpid.`:''} ${state.fx.enabled?'':'Encara està desactivat: prova-ho i activa’l quan t’agradi.'}`);
   }catch(e){ fxMsg('⚠️ '+(e.message||e)); }
+  try{ if(wl) wl.release(); }catch{}
   FXS.busy=false; fxAdminUi();
 }
 async function fxToggle(){
@@ -2315,7 +2371,7 @@ async function fxClear(){
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-fx]'); if(!b) return; const a=b.dataset.fx;
-  if(a==='test') fxRun(3); else if(a==='all') fxRun(); else if(a==='stop'){ FXS.stop=true; fxMsg('Aturant…'); }
+  if(a==='test') fxRun(3); else if(a==='all') fxRun(); else if(a==='redo'){ if(confirm('Tornar a retallar TOTES les fotos amb el mode triat? Substituirà les retallades actuals.')) fxRun(1e9,true); } else if(a==='stop'){ FXS.stop=true; fxMsg('Aturant…'); }
   else if(a==='toggle') fxToggle(); else if(a==='clear') fxClear();
 });
 /*FX-END*/
