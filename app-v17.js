@@ -102,12 +102,13 @@ function hideAuth(){ $('authGate').style.display='none'; $('appShell').style.dis
 
 function playerCard(p,inTeam=false){
   const dorsal=p.shirt_number ?? '—';
-  const photo=p.photo_url ? `<img src="${escapeHtml(p.photo_url)}" alt="${escapeHtml(p.name)}" class="player-photo" loading="lazy" decoding="async" onerror="fixImageError(this)">` : '<img src="logo.png" alt="" class="player-photo logo-ph">';
+  const fxp=fxPick('p',p.id,p.photo_url);
+  const photo=p.photo_url ? `<img src="${escapeHtml(fxp.src)}" alt="${escapeHtml(p.name)}" class="player-photo${fxp.cut?' is-cut':''}"${fxp.cut?` data-orig="${escapeHtml(p.photo_url)}"`:''} loading="lazy" decoding="async" onerror="fxErr(this)">` : '<img src="logo.png" alt="" class="player-photo logo-ph">';
   const owned=state.rosterPlayers.some(x=>String(x.player_id)===String(p.id));
   const roster=state.rosterPlayers.find(x=>String(x.player_id)===String(p.id));
   const isCaptain=Boolean(roster?.is_captain);
   const first=escapeHtml(p.name||''), sur=escapeHtml(p.surname||''), pts=f1(state.pts?.[p.id]||0);
-  return `<article class="player-card pc2${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual">${photo}<img class="pc2-logo" src="logo.png" alt="" aria-hidden="true"><span class="pc-num"><i>#</i>${escapeHtml(String(dorsal).replace(/\.0$/,''))}</span>${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}<div class="pc2-name"><small>${first}</small><b>${sur||first}</b><em>${escapeHtml(teamName(p.real_team_id))}</em></div></div><div class="pc2-stats"><div class="pc2-val"><b>${money(p.current_value)}</b><small>VALOR</small></div><div class="pc2-pts"><b>${pts}</b><small>PUNTS</small></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card pc2${isCaptain?' captain-card':''}" data-pid="${p.id}"><div class="player-visual${fxp.cut?' has-cut':''}">${photo}<img class="pc2-logo" src="logo.png" alt="" aria-hidden="true"><span class="pc-num"><i>#</i>${escapeHtml(String(dorsal).replace(/\.0$/,''))}</span>${isCaptain?'<span class="captain-badge">⭐ CAPITÀ</span>':''}<div class="pc2-name"><small>${first}</small><b>${sur||first}</b><em>${escapeHtml(teamName(p.real_team_id))}</em></div></div><div class="pc2-stats"><div class="pc2-val"><b>${money(p.current_value)}</b><small>VALOR</small></div><div class="pc2-pts"><b>${pts}</b><small>PUNTS</small></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-captain-player="${p.id}">${isCaptain?'⭐ Capità':'Fer capità'}</button><button class="secondary" data-sell-player="${p.id}">Vendre</button>`:`<button class="primary" data-buy-player="${p.id}">${owned?'Ja fitxat':`Fitxar · ${money(Number(p.current_value)*1.05)}`}</button>`}</div></article>`;
 }
 function coachCard(c,realTeamId,inTeam=false){
   const relation=state.coachTeams.find(r=>String(r.coach_id)===String(c.id)&&String(r.real_team_id)===String(realTeamId));
@@ -116,8 +117,9 @@ function coachCard(c,realTeamId,inTeam=false){
   if(!relation)return '';
   const coachPhoto=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`;
   const owned=state.rosterCoaches.some(x=>String(x.coach_id)===String(c.id)&&String(x.real_team_id)===String(realTeamId));
+  const fxc=fxPick('c',c.id,coachPhoto);
   const cn=String(coachName(c)||'').trim().split(/\s+/), csur=escapeHtml(cn.length>1?cn[cn.length-1]:cn[0]), cfirst=escapeHtml(cn.length>1?cn.slice(0,-1).join(' '):'');
-  return `<article class="player-card pc2 pc2-coach" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual"><img src="${escapeHtml(coachPhoto)}" alt="${escapeHtml(coachName(c))}" class="player-photo" loading="lazy" decoding="async" data-ph="🧑‍🏫" onerror="fixImageError(this)"><img class="pc2-logo" src="logo.png" alt="" aria-hidden="true"><span class="pc2-role">ENTRENADOR</span><div class="pc2-name"><small>${cfirst}</small><b>${csur}</b><em>${escapeHtml(teamName(realTeamId))}</em></div></div><div class="pc2-stats"><div class="pc2-val"><b>${money(coachValue)}</b><small>VALOR</small></div><div class="pc2-pts"><b>${owned?'✔':'—'}</b><small>${owned?'FITXAT':'MERCAT'}</small></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
+  return `<article class="player-card pc2 pc2-coach" data-cid="${c.id}" data-ctid="${realTeamId}"><div class="player-visual${fxc.cut?' has-cut':''}"><img src="${escapeHtml(fxc.src)}" alt="${escapeHtml(coachName(c))}" class="player-photo${fxc.cut?' is-cut':''}"${fxc.cut?` data-orig="${escapeHtml(coachPhoto)}"`:''} loading="lazy" decoding="async" data-ph="🧑‍🏫" onerror="fxErr(this)"><img class="pc2-logo" src="logo.png" alt="" aria-hidden="true"><span class="pc2-role">ENTRENADOR</span><div class="pc2-name"><small>${cfirst}</small><b>${csur}</b><em>${escapeHtml(teamName(realTeamId))}</em></div></div><div class="pc2-stats"><div class="pc2-val"><b>${money(coachValue)}</b><small>VALOR</small></div><div class="pc2-pts"><b>${owned?'✔':'—'}</b><small>${owned?'FITXAT':'MERCAT'}</small></div></div><div class="card-actions">${inTeam?`<button class="secondary" data-sell-coach="${c.id}" data-sell-coach-team="${realTeamId}">Vendre</button>`:`<button class="primary" data-buy-coach="${c.id}" data-buy-coach-team="${realTeamId}">${owned?'Ja fitxat':`Fitxar · ${money(coachValue*1.05)}`}</button>`}</div></article>`;
 }
 
 function render(){
@@ -394,7 +396,7 @@ async function loadData(){
     ]);
     for(const [r,label] of [[roundsR,'jornada'],[teamsR,'equips'],[playersR,'jugadors'],[coachesR,'entrenadors'],[coachTeamsR,'relacions'],[coachMarketsR,'mercat entrenadors'],[teamR,'equip Fantasy'],[ftpR,'plantilla'],[ftcR,'entrenadors Fantasy']])if(!r.ok)throw new Error(`${label}: ${await r.text()}`);
     state.round=(await roundsR.json())[0]||null; state.teams=await teamsR.json(); state.players=await playersR.json(); state.coaches=await coachesR.json(); state.coachTeams=await coachTeamsR.json(); state.coachMarkets=await coachMarketsR.json(); state.team=(await teamR.json())[0]||null; state.rosterPlayers=await ftpR.json(); state.rosterCoaches=await ftcR.json();
-    await loadCoachContext();
+    await loadCoachContext(); await loadFx();
     if(!state.team) throw new Error('No s’ha trobat l’equip Fantasy de l’usuari.');
     $('teamFilter').innerHTML='<option value="">Tots els equips</option>'+state.teams.map(t=>`<option value="${escapeHtml(t.id)}">${escapeHtml(t.name)}</option>`).join('');
     $('connectionStatus').textContent=`Supabase · Jornada ${state.round?.round_number??'—'}`; render(); loadMarket(); loadHomeMatches(); loadExtras(); maybeTour(); redeemPending(); initPush(); loadMissions(); loadPredictions(); loadReferral(); redeemRef(); redeemLeague(); loadSummary(); loadBadges(); loadHistory(true); initMinigames(); initCards(); initBot(); renderInstall(); renderInstall();
@@ -1605,7 +1607,7 @@ document.addEventListener('click',e=>{
 });
 setInterval(()=>{ if(document.visibilityState==='visible'){ loadBadges(); } },600000);
 
-const APP_VERSION=105; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
+const APP_VERSION=106; { const el=$('verJs'); if(el) el.textContent='v'+APP_VERSION; }
 
 /* ===== ANIMACIONS ===== */
 const reduceMotion=()=>matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -2217,6 +2219,107 @@ function avSyncBtn(){ const b=$('avBtn'); if(b) b.innerHTML=((state.avatars||{})
 document.addEventListener('click',e=>{ if(e.target.closest('#avBtn,[data-avopen]')) avOpen(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') avClose(); });
 /*AV-END*/
+/*FX-START*/
+state.fx=state.fx||{enabled:false,cut:{}};
+const FX_CDN='https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/';
+async function loadFx(){
+  try{ const r=await rpc('get_photo_fx',{}); if(r.ok){ const d=await r.json(); state.fx={enabled:!!(d&&d.enabled),cut:(d&&d.cut)||{}}; } }catch{}
+  try{ fxAdminUi(); }catch{}
+}
+function fxPick(k,id,orig){
+  const c=state.fx&&state.fx.enabled&&state.fx.cut[k+':'+id];
+  if(c&&c.u&&orig&&(!c.s||c.s===orig)) return {src:c.u,cut:true};
+  return {src:orig,cut:false};
+}
+function fxErr(img){
+  if(img.dataset.orig&&!img.dataset.fxb){ img.dataset.fxb='1'; img.classList.remove('is-cut'); const v=img.closest('.player-visual'); if(v) v.classList.remove('has-cut'); img.src=img.dataset.orig; return; }
+  fixImageError(img);
+}
+/* --- Administració --- */
+const FXS={busy:false,stop:false,seg:null,resolve:null};
+function fxItems(){
+  const out=[];
+  (state.players||[]).forEach(p=>{ if(p.photo_url) out.push({k:'p',kind:'player',id:p.id,src:p.photo_url,name:`${p.name||''} ${p.surname||''}`.trim()}); });
+  (state.coaches||[]).forEach(c=>{ const ph=(c.photo_url&&c.photo_url.includes('/storage/v1/'))?c.photo_url:`entrenador-${c.id}.jpeg`; out.push({k:'c',kind:'coach',id:c.id,src:ph,name:String(coachName(c)||'')}); });
+  return out;
+}
+function fxPending(){ return fxItems().filter(x=>{ const c=state.fx.cut[x.k+':'+x.id]; return !c||c.s!==x.src; }); }
+function fxAdminUi(){
+  const st=$('fxState'); if(!st) return;
+  const n=Object.keys(state.fx.cut).length, pend=fxPending().length;
+  st.innerHTML=`Estat: <b>${state.fx.enabled?'🟢 Activat':'⚪ Desactivat'}</b> · retallades fetes: <b>${n}</b> · pendents: <b>${pend}</b>`;
+  const t=$('fxToggle'); if(t) t.textContent=state.fx.enabled?'Desactivar fons':'Activar fons';
+}
+function fxMsg(t){ const e=$('fxProg'); if(e) e.textContent=t; }
+function fxLoadLib(){
+  return new Promise((ok,ko)=>{ if(window.SelfieSegmentation) return ok(); const s=document.createElement('script'); s.src=FX_CDN+'selfie_segmentation.js'; s.onload=ok; s.onerror=()=>ko(new Error('No s’ha pogut carregar el model de retallada (comprova internet o bloquejadors).')); document.head.appendChild(s); });
+}
+async function fxSegmenter(){
+  await fxLoadLib();
+  if(!FXS.seg){ const sg=new SelfieSegmentation({locateFile:f=>FX_CDN+f}); sg.setOptions({modelSelection:0}); sg.onResults(r=>{ if(FXS.resolve) FXS.resolve(r); }); await sg.initialize(); FXS.seg=sg; }
+  return FXS.seg;
+}
+async function fxCut(url){
+  const resp=await fetch(url,{mode:'cors'}); if(!resp.ok) throw new Error('No es pot llegir la foto ('+resp.status+')');
+  const bmp=await createImageBitmap(await resp.blob());
+  const k=Math.min(1,720/Math.max(bmp.width,bmp.height)), w=Math.round(bmp.width*k), h=Math.round(bmp.height*k);
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(bmp,0,0,w,h);
+  const seg=await fxSegmenter();
+  const res=await new Promise((ok,ko)=>{ FXS.resolve=ok; const to=setTimeout(()=>ko(new Error('El model no ha respost.')),20000); seg.send({image:c}).catch(ko).then(()=>clearTimeout(to)); });
+  const m=document.createElement('canvas'); m.width=w; m.height=h; const mx=m.getContext('2d',{willReadFrequently:true}); mx.drawImage(res.segmentationMask,0,0,w,h);
+  const md=mx.getImageData(0,0,w,h).data, im=x.getImageData(0,0,w,h), d=im.data;
+  let opaque=true; for(let i=3;i<md.length;i+=4){ if(md[i]!==255){ opaque=false; break; } }
+  let fg=0;
+  for(let i=0;i<d.length;i+=4){
+    const v=(opaque?md[i]:md[i+3])/255, t=Math.min(1,Math.max(0,(v-0.42)/0.30)), a=t*t*(3-2*t);
+    d[i+3]=Math.round(a*255); if(a>.5) fg++;
+  }
+  if(fg<w*h*0.04) throw new Error('No s’ha detectat cap persona a la foto.');
+  x.putImageData(im,0,0);
+  return await new Promise(ok=>c.toBlob(ok,'image/png'));
+}
+async function fxRun(limit){
+  if(FXS.busy) return; if(!state.session) return alert('Cal iniciar sessió.');
+  const list=fxPending().slice(0,limit||1e9); if(!list.length){ fxMsg('No hi ha fotos pendents.'); return; }
+  FXS.busy=true; FXS.stop=false; let ok=0, bad=0; const prev=$('fxPrev'); if(prev) prev.innerHTML='';
+  try{
+    for(let i=0;i<list.length;i++){
+      if(FXS.stop) break; const it=list[i]; fxMsg(`Processant ${i+1}/${list.length}: ${it.name||it.id}…`);
+      try{
+        const blob=await fxCut(it.src);
+        const path=`cutout/${it.kind}-${it.id}-${Date.now()}.png`;
+        const up=await fetch(`${SUPABASE_URL}/storage/v1/object/fotos/${path}`,{method:'POST',headers:{...headers(),'Content-Type':'image/png'},body:blob});
+        if(!up.ok) throw new Error('No s’ha pogut pujar ('+up.status+')');
+        const url=`${SUPABASE_URL}/storage/v1/object/public/fotos/${path}`;
+        const r=await rpc('admin_save_cutout',{p_kind:it.kind,p_ref:Number(it.id),p_url:url,p_src:it.src}); if(!r.ok) throw new Error((await r.text()).slice(0,120));
+        state.fx.cut[it.k+':'+it.id]={u:url,s:it.src}; ok++;
+        if(prev) prev.insertAdjacentHTML('beforeend',`<span class="fx-th" title="${escapeHtml(it.name)}"><img src="${URL.createObjectURL(blob)}" alt=""></span>`);
+      }catch(e){ bad++; if(prev) prev.insertAdjacentHTML('beforeend',`<span class="fx-th bad" title="${escapeHtml((it.name||'')+': '+(e.message||e))}">⚠️</span>`); }
+      fxAdminUi();
+    }
+    fxMsg(`Fet: ${ok} retallades${bad?`, ${bad} amb error (passa el ratolí per veure el motiu)`:''}.${FXS.stop?' (aturat)':''} ${state.fx.enabled?'':'Encara està desactivat: prova-ho i activa’l quan t’agradi.'}`);
+  }catch(e){ fxMsg('⚠️ '+(e.message||e)); }
+  FXS.busy=false; fxAdminUi();
+}
+async function fxToggle(){
+  const on=!state.fx.enabled, r=await rpc('admin_set_photo_fx',{p_on:on});
+  if(!r.ok){ const t=await r.text(); let m=t; try{ m=JSON.parse(t).message||t; }catch{} return alert('⚠️ '+m+' (has d’executar el pas 49).'); }
+  state.fx.enabled=on; fxAdminUi(); try{ render(); if(typeof renderMarket==='function') renderMarket(); }catch{}
+  fxMsg(on?'Fons activat per a tothom.':'Fons desactivat: tothom veu les fotos originals.');
+}
+async function fxClear(){
+  if(!confirm('Esborrar totes les fotos retallades? Les fotos originals no es toquen.')) return;
+  const r=await rpc('admin_clear_cutouts',{}); if(!r.ok) return alert('⚠️ '+(await r.text()).slice(0,140));
+  state.fx.cut={}; fxAdminUi(); try{ render(); if(typeof renderMarket==='function') renderMarket(); }catch{}
+  fxMsg('Retallades esborrades.'); const p=$('fxPrev'); if(p) p.innerHTML='';
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-fx]'); if(!b) return; const a=b.dataset.fx;
+  if(a==='test') fxRun(3); else if(a==='all') fxRun(); else if(a==='stop'){ FXS.stop=true; fxMsg('Aturant…'); }
+  else if(a==='toggle') fxToggle(); else if(a==='clear') fxClear();
+});
+/*FX-END*/
+
 /*NEWS-START*/
 const NEWS_ID='news-avatars-v100';
 function newsSeen(){ try{ return localStorage.getItem(NEWS_ID)==='1'; }catch{ return false; } }
